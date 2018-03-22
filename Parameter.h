@@ -14,27 +14,37 @@
 #include <opencv2/calib3d.hpp>
 #include <opencv2/core/eigen.hpp>
 using namespace std;
+struct Label
+{
+	int SID;
+	size_t frameIndex;
+	cv::Rect position;
+	string color;
+};
 class Signal
 {
 public:
 	Signal() {
 		color = "white";
-		MapPointId = -1;
+		SID= -1;
 		startFrame = -1;
 		endFrame = -1;
 		trackStatus = "untracked";
-		worldPosition = Eigen::Vector3f::Zero();
+		LeftUpPos = Eigen::Vector3f::Zero();
 		r = g = b = a = 255;
 	}
 public:
 	string name;
 	string color;
-	int MapPointId;
+	int SID;
 	int startFrame;
 	int endFrame;
 	string trackStatus;
-	Eigen::Vector3f worldPosition;
+	Eigen::Vector3f LeftUpPos;
+	Eigen::Vector3f RightDownPos;
+	cv::Rect CurFrameRect;
 	unsigned char r, g, b, a;
+	vector<Label> ObsLabels;
 
 };
 struct Point
@@ -43,12 +53,6 @@ struct Point
 	unsigned char r, g, b, a;
 };
 
-struct Label
-{
-	size_t frameIndex;
-	cv::Rect position;
-	string color;
-};
 class Cam_intrinsic
 {
    public:
@@ -73,14 +77,13 @@ public:
 	//string getData(string key);
 	//void readLabel(string path);
 	//vector<Label> getLabels(int frameIndex);
-	vector<Label> getLabels(int frameIndex)
+	vector<Label>* getLabels(int frameIndex)
 	{
-		std::vector<Label> tmp;
 		auto iter = LabelData.find(frameIndex);
 		if (iter == LabelData.end())
-			return tmp;
+			return nullptr;
 		else
-			return iter->second;
+			return &(iter->second);
 	}
 	void readLine(ifstream &fin, float &value)
 	{
@@ -155,7 +158,7 @@ public:
 			ss >> name >>type >>probability >> px >> py >> qx >> qy;
 			if (fId != LastFid && LastFid != 0)
 			{
-				LabelData[LastFid] = Labels1Frame;
+				LabelData.insert({LastFid,Labels1Frame});
 				Labels1Frame.clear();
 			}
 			Label label;
@@ -175,7 +178,7 @@ public:
 		} 
 		float tm;
 		float linedata[12];
-        Eigen::Matrix4f Pose;
+        Eigen::Matrix<float,3,4> Pose;
 		while (!fin.eof())
 		{
 			string line;
@@ -199,9 +202,9 @@ public:
 				Pose(1,3) = linedata[1];
 				Pose(2,3) = linedata[2];
 				// 0 0 0 1
-				Pose(3,0) = Pose(3,1) = Pose(3,2) = 0;
-				Pose(3,3) = 1;
-				// center = -Pose.block<3,3>(0,0).transpose()*Pose.block<3,1>(0,3);
+				// Pose(3,0) = Pose(3,1) = Pose(3,2) = 0;
+				// Pose(3,3) = 1;
+				// // center = -Pose.block<3,3>(0,0).transpose()*Pose.block<3,1>(0,3);
 				// center = Eigen::Vector3d(linedata[0],linedata[1],linedata[2]);
 				trajectory.push_back(Pose);
 			}
@@ -248,8 +251,8 @@ public:
 	}
 public:
 	unordered_map <string, string> data;//parameter.txt ÆäËû²ÎÊý
-	vector<Eigen::Matrix4f> trajectory;//result
-	unordered_map<int,vector< Label>> LabelData;//label.txt
+	vector<Eigen::Matrix<float,3,4> > trajectory;//result
+	unordered_map<int,vector< Label>> LabelData;// may be need modify set to pointer;
 	Cam_intrinsic cam_intrinsic;
 };
 
