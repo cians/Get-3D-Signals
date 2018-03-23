@@ -1,6 +1,6 @@
 #pragma once
-#ifndef PARASPRE
-#define PARASPRE
+#ifndef _PARAMETER_H_
+#define _PARAMETER_H_
 #include <fstream>
 #include <string>
 #include <iostream>
@@ -13,7 +13,13 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/core/eigen.hpp>
-using namespace std;
+
+using std::string;
+using std::vector;
+using std::cout;
+using std::cerr;
+using std::endl;
+
 struct Label
 {
 	int SID;
@@ -44,7 +50,7 @@ public:
 	Eigen::Vector3f RightDownPos;
 	cv::Rect CurFrameRect;
 	unsigned char r, g, b, a;
-	vector<Label> ObsLabels;
+	std::vector<Label> ObsLabels;
 
 };
 struct Point
@@ -53,7 +59,7 @@ struct Point
 	unsigned char r, g, b, a;
 };
 
-class Cam_intrinsic
+class CamParams
 {
    public:
 	float fx, fy, cx, cy;
@@ -71,13 +77,13 @@ class Cam_intrinsic
 class ParameterReader
 {
 public:
-	//void readLine(ifstream &fin, float &value);
-	//void readSignal(ifstream &fin, string sname);
-	//void readCamIntrinsic(ifstream &fin, string fx_value);
+	//void readLine(std::ifstream &fin, float &value);
+	//void readSignal(std::ifstream &fin, string sname);
+	//void readCamIntrinsic(std::ifstream &fin, string fx_value);
 	//string getData(string key);
 	//void readLabel(string path);
 	//vector<Label> getLabels(int frameIndex);
-	vector<Label>* getLabels(int frameIndex)
+	std::vector<Label>* getLabels(int frameIndex)
 	{
 		auto iter = LabelData.find(frameIndex);
 		if (iter == LabelData.end())
@@ -85,7 +91,7 @@ public:
 		else
 			return &(iter->second);
 	}
-	void readLine(ifstream &fin, float &value)
+	void readLine(std::ifstream &fin, float &value)
 	{
 		string LineStr;
 		getline(fin, LineStr);
@@ -95,85 +101,85 @@ public:
 		string key = LineStr.substr(0, pos);
 		value = stof(LineStr.substr(pos + 1, LineStr.length()));
 	}
-	void readCamIntrinsic(ifstream &fin, string fx_value)
+	void readCamIntrinsic(std::ifstream &fin, string fx_value)
 	{
-		cam_intrinsic.fx = stof(fx_value);
+		camParams.fx = stof(fx_value);
 		string fyLine, cxLine, cyLine, distLine;
 		string key, value;
-		readLine(fin, cam_intrinsic.fy);
-		readLine(fin, cam_intrinsic.cx);
-		readLine(fin, cam_intrinsic.cy);
+		readLine(fin, camParams.fy);
+		readLine(fin, camParams.cx);
+		readLine(fin, camParams.cy);
 		string distortLine;
 		getline(fin, distortLine);
 		size_t pos = distortLine.find("=");
 		string distor = distortLine.substr(pos + 1, distortLine.length());
-		stringstream ss_distor;
+		std::stringstream ss_distor;
 		ss_distor.str(distor);
 		string d0, d1, d2, d3, d4;
 		ss_distor >> d0 >> d1 >> d2 >> d3 >> d4;
-		cam_intrinsic.distortion[0] = stof(d0);
-		cam_intrinsic.distortion[1] = stof(d1);
-		cam_intrinsic.distortion[2] = stof(d2);
-		cam_intrinsic.distortion[3] = stof(d3);
-		cam_intrinsic.distortion[4] = stof(d4);
-		cam_intrinsic.fill_INTRINSIC();
+		camParams.distortion[0] = stof(d0);
+		camParams.distortion[1] = stof(d1);
+		camParams.distortion[2] = stof(d2);
+		camParams.distortion[3] = stof(d3);
+		camParams.distortion[4] = stof(d4);
+		camParams.fill_INTRINSIC();
 		printf("Get camera intrinsic !\n");
 	}
 
 	string getData(string key)
 	{
-		unordered_map <string, string>::iterator iter = data.find(key);
-		if (iter == data.end())
+		std::unordered_map <string, string>::iterator iter = paramsMap.find(key);
+		if (iter == paramsMap.end())
 		{
-			cerr << "Parameter name " << key << "not found!" << endl;
+			std::cerr << "Parameter name " << key << "not found!\n";
 			return string("NOT FOUND!");
 		}
 		return iter->second; //second is the value, first is the key
 	}
 	void readLabel(string path)
 	{
-		//cout<<"/home/sensetime/Downloads/GOD/label_157_part.txt"<<endl
-		ifstream iter(path);
-		if (!iter.is_open()){
-			cerr<<"failed!\n";
+		//std::cout<<"/home/sensetime/Downloads/GOD/label_157_part.txt"<<endl
+		std::ifstream fin(path);
+		if (!fin.is_open()){
+			std::cerr<<"failed!\n";
 		}
-		int start = stoi(getData("rec_start"));
-		int end = stoi(getData("rec_end"));
+		int startId = stoi(getData("rec_start"));
+		int endId = stoi(getData("rec_end"));
 		int LastFid = 0;
 		std::vector< Label> Labels1Frame;
-		while (!iter.eof())
+		while (!fin.eof())
 		{
-			string str;
-			getline(iter, str);
-			int length = str.length();
+			string lineStr;
+			getline(fin, lineStr);
+			int length = lineStr.length();
 			if (length < 12)
 				continue;
-			size_t posit = 4;
-			int fId = stoi(str.substr(posit, 5));
-			if (fId < start || fId > end)
+			size_t posit = 4;//!Need change as your file format!!!
+			int frameId = stoi(lineStr.substr(posit, 5));//!Need change as your file format!!!
+			if (frameId < startId || frameId > endId)
 				continue;
-			stringstream ss;
-			ss.str(str);
+			std::stringstream lineStrStream;
+			lineStrStream.str(lineStr);
 			string name,type, probability, px, py, qx, qy;
-			ss >> name >>type >>probability >> px >> py >> qx >> qy;
-			if (fId != LastFid && LastFid != 0)
+			lineStrStream >> name >>type >>probability >> px >> py >> qx >> qy;
+			if (frameId != LastFid && LastFid != 0)
 			{
 				LabelData.insert({LastFid,Labels1Frame});
 				Labels1Frame.clear();
 			}
 			Label label;
-			label.frameIndex = fId;
+			label.frameIndex = frameId;
 			label.position = cv::Rect(stoi(px), stoi(py), stoi(qx)-stoi(px), stoi(qy)-stoi(py));
 			label.color = type;
 			Labels1Frame.push_back(label);
-			LastFid = fId;
+			LastFid = frameId;
 		}
 	}
 	void readTracjectory(string tPath)
 	{
-		ifstream fin(tPath);
+		std::ifstream fin(tPath);
 		if(!fin.is_open()){
-			cerr<<"failed to load tracjectory!\n";
+			std::cerr<<"failed to load tracjectory!\n";
 			return;
 		} 
 		float tm;
@@ -212,30 +218,30 @@ public:
 	}
 	ParameterReader(string pFile)
 	{
-		ifstream fin(pFile.c_str());
+		std::ifstream fin(pFile.c_str());
 		if (!fin)
 		{
-			cerr << "parameter file missed" << endl;
+			std::cerr << "parameter file missed\n";
 			return;
 		}
 		while (!fin.eof())
 		{
-			string str;
-			getline(fin, str);
-			if (str[0] == '#')
+			string lineStr;
+			getline(fin, lineStr);
+			if (lineStr[0] == '#')
 			{
 				continue;
 			}
-			int pos = str.find("=");
+			int pos = lineStr.find("=");
 			if (pos == -1)
 				continue;
-			string key = str.substr(0, pos);
-			string value = str.substr(pos + 1, str.length()-pos-1);
+			string key = lineStr.substr(0, pos);
+			string value = lineStr.substr(pos + 1, lineStr.length()-pos-1);
 			if(value[value.size()-1] == 13)//去除换行
 			{
 				value.pop_back();
 			}
-			data[key] = value;
+			paramsMap[key] = value;
 			if (key == "fx")
 			{
 				readCamIntrinsic(fin, value);
@@ -245,16 +251,16 @@ public:
 				break;
 		}
 		readLabel(getData("label_path"));
-		cout<<"collected "<<data.size()<<" paras!\n";
+		printf("collected %zd paras\n",paramsMap.size());
 		readTracjectory(getData("trajectroy_path"));
 		printf("loaded tracjectory total %zd frame \n",trajectory.size());
 	}
 public:
-	unordered_map <string, string> data;//parameter.txt ÆäËû²ÎÊý
-	vector<Eigen::Matrix<float,3,4> > trajectory;//result
-	unordered_map<int,vector< Label>> LabelData;// may be need modify set to pointer;
-	Cam_intrinsic cam_intrinsic;
+	std::unordered_map <string, string> paramsMap;//parameter.txt ÆäËû²ÎÊý
+	std::vector<Eigen::Matrix<float,3,4> > trajectory;//result
+	std::unordered_map<int,std::vector< Label>> LabelData;// may be need modify set to pointer;
+	CamParams camParams;
 };
 
 
-#endif // PARASPRE
+#endif // _PARAMETER_H_

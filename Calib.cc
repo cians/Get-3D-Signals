@@ -4,17 +4,16 @@ class RectCalib
 {
 public:
     RectCalib(ParameterReader pd):pReader(pd){}
-    cv::Rect LampCalib(cv::Rect ori, cv::Mat img)
+    cv::Rect LampCalib(cv::Rect oriRect, cv::Mat img)
     {
         using namespace cv;
-    // cout<<ori.width<<"."<<ori.height<<endl;
-        if(ori.width < 20 && ori.height < 40)
-            return ori;
+        if(oriRect.width < 20 && oriRect.height < 40)
+            return oriRect;
         int expand = 6;
-        cv::Rect res(max(0,ori.x-expand), max(0,ori.y-expand), ori.width + 2*expand, ori.height+2*expand);
-        res.width = res.x+res.width > img.cols ? img.cols-res.x : res.width;
-        res.height = res.y+res.height > img.rows ? img.rows-res.height : res.height;
-        cv::Mat img_cand = img(res);
+        cv::Rect epRect(max(0,oriRect.x-expand), max(0,oriRect.y-expand), oriRect.width + 2*expand, oriRect.height+2*expand);
+        epRect.width = epRect.x+epRect.width > img.cols ? img.cols-epRect.x : epRect.width;
+        epRect.height = epRect.y+epRect.height > img.rows ? img.rows-epRect.height : epRect.height;
+        cv::Mat img_cand = img(epRect);
         blur( img_cand, img_cand, Size(3,3));
         // imshow("tmp",img_cand);
         // waitKey();
@@ -26,7 +25,7 @@ public:
         //threshold( src_gray, threshold_output, 100, 255, THRESH_BINARY );
         Canny(src_gray, src_gray, 50, 100);
         //imshow("sss",src_gray);
-        //保留1/4
+        //保留1/4的角落
         //int splitc = (int)(0.25 * src_gray.cols);
         int splitr = (int)(0.25 * src_gray.rows);
     // src_gray.colRange(splitc, src_gray.cols-splitc).setTo(0);
@@ -39,16 +38,16 @@ public:
         //     drawContours( imageContours, contours, (int)i, Scalar(255), 1, 8, hierarchy);
         // }
         //  imshow("tmp",imageContours);
-        cv::Rect r0= boundingRect(src_gray);  
-    // cv::rectangle(img_cand, r0, Scalar(255,0,0),2); 
-        //cv::rectangle(img_cand, ori, Scalar(0,255,0),2);
+        cv::Rect myRect= boundingRect(src_gray);  
+    // cv::rectangle(img_cand, myRect, Scalar(255,0,0),2); 
+        //cv::rectangle(img_cand, oriRect, Scalar(0,255,0),2);
     // imshow("tmp2",img_cand);
-    if(r0.height < r0.width || r0.height < 20)
-            r0.height = ori.height;
-    if(r0.width < 10)
-            r0.width = ori.width;
+    if(myRect.height < myRect.width || myRect.height < 20)
+            myRect.height = oriRect.height;
+    if(myRect.width < 10)
+            myRect.width = oriRect.width;
         //waitKey();
-        return cv::Rect(r0.x+res.x, r0.y+res.y, r0.width, r0.height);
+        return cv::Rect(myRect.x+epRect.x, myRect.y+epRect.y, myRect.width, myRect.height);
     }
     vector<cv::Rect> updateSignals(int index)
     {
@@ -68,7 +67,7 @@ public:
                 {
                     auto label = vSignals[j].ObsLabels[i];
                     size_t ti = label.frameIndex - rec_start;
-                    Eigen::Matrix<float, 3, 4> CAM_P = pReader.cam_intrinsic.INTRINSIC*pReader.trajectory[ti];
+                    Eigen::Matrix<float, 3, 4> CAM_P = pReader.camParams.INTRINSIC*pReader.trajectory[ti];
                     Eigen::Vector2i leftu(label.position.x, label.position.y);
                     Eigen::Vector2i rightd(label.position.x+label.position.width, label.position.y+label.position.height); 
                     Tl.block<1, 3>(2*i, 0) = CAM_P.block<1, 3>(0, 0) - leftu(0) * CAM_P.block<1, 3>(2, 0);
@@ -93,7 +92,7 @@ public:
                     printf("a passed lamp|\n");
                     continue;
                 }
-                auto cam_p = pReader.cam_intrinsic.INTRINSIC*pReader.trajectory[index];
+                auto cam_p = pReader.camParams.INTRINSIC*pReader.trajectory[index];
                 cv::Rect curRect = reproject2img(leftpos,rightpos,cam_p);
                 vSignals[j].CurFrameRect = curRect;
                 SignalRects.push_back(curRect);
@@ -128,7 +127,7 @@ public:
                 Eigen::Vector3f c2l = vSignals[i].LeftUpPos - pReader.trajectory[index].block<3,1>(0,3);
                 if (c2l.dot(CamBack)/(c2l.norm()*CamBack.norm()) > -0.5)
                     continue;
-                auto cam_p = pReader.cam_intrinsic.INTRINSIC*pReader.trajectory[index];
+                auto cam_p = pReader.camParams.INTRINSIC*pReader.trajectory[index];
                 cv::Rect curRect = reproject2img(vSignals[i].LeftUpPos,vSignals[i].RightDownPos,cam_p);
                 vSignals[i].CurFrameRect = curRect;
                 LastLampRects.push_back(curRect);
@@ -206,11 +205,11 @@ public:
                 //一帧帧显示图像
                 cv::Mat img,img_calib;	
                 //imgShowSeque >> img;
-                stringstream numberss;
+                std::stringstream numberss;
                 numberss << std::setw(5) << std::setfill('0') << rec_start+drawImgsNum; // 0000, 0001, 0002, etc...
                 std::string name = img_path + "157_" +numberss.str() + ".png";
                 img = cv::imread(name);
-                auto camm = pReader.cam_intrinsic;
+                auto camm = pReader.camParams;
                 cv::Mat camMatrix = (cv::Mat_<float>(3,3)<<camm.fx, 0, camm.cx, 
                                                         0, camm.fy, camm.cy,
                                                         0 , 0, 1);
@@ -244,8 +243,8 @@ public:
                             continue;
                         cv::rectangle(showImg, lab.position, cv::Scalar(0,255,0), 1);
                         RectsOri.push_back(lab.position);
-                        cv::Rect lamp_calib = LampCalib(lab.position, img);
-                        cv::rectangle(showImg, lamp_calib, cv::Scalar(0,0,255), 2);
+                        // cv::Rect lamp_calib = LampCalib(lab.position, img);
+                        // cv::rectangle(showImg, lamp_calib, cv::Scalar(0,0,255), 2);
                     }
                 auto Rects = RebuildLamp(drawImgsNum, img);
                 if(Rects.size() == 0) Rects = RectsOri;
@@ -261,10 +260,10 @@ public:
                 //cv::moveWindow("video", 868, 0);
                 //imshow时间太短，movewindow好像没用，只好暂停手动调整下窗口位置便于录屏。
                 // if (drawImgsNum < 1)
-                char key = cv::waitKey(100);
-                if(key == 'p') playvideo = !playvideo;
+                char presskey = cv::waitKey(100);
+                if(presskey == 'p') playvideo = !playvideo;
                 if(playvideo){
-                    cout<<drawImgsNum+rec_start<<endl;
+                    cout<<drawImgsNum+rec_start<<'\n';
                     drawImgsNum++;
                 }
             }
