@@ -216,6 +216,7 @@ public:
 			}
 		}
 	}
+	ParameterReader(){}
 	ParameterReader(string pFile)
 	{
 		std::ifstream fin(pFile.c_str());

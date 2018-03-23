@@ -3,7 +3,10 @@
 class RectCalib
 {
 public:
-    RectCalib(ParameterReader pd):pReader(pd){}
+    RectCalib(ParameterReader pd, bool undistorted){
+        pReader = pd;
+        undistortedImg = undistorted;
+    }
     cv::Rect LampCalib(cv::Rect oriRect, cv::Mat img)
     {
         using namespace cv;
@@ -209,38 +212,42 @@ public:
                 numberss << std::setw(5) << std::setfill('0') << rec_start+drawImgsNum; // 0000, 0001, 0002, etc...
                 std::string name = img_path + "157_" +numberss.str() + ".png";
                 img = cv::imread(name);
-                auto camm = pReader.camParams;
-                cv::Mat camMatrix = (cv::Mat_<float>(3,3)<<camm.fx, 0, camm.cx, 
-                                                        0, camm.fy, camm.cy,
-                                                        0 , 0, 1);
-                cv::Mat distCoeffs = cv::Mat(5,1,CV_32F,camm.distortion);
-                cv::undistort(img, img_calib, camMatrix, distCoeffs);
-                img = img_calib.clone();
-               // img_calib = img.clone();
                 if (img.empty())
                     return 0;
+                auto camm = pReader.camParams;
+                if (!undistortedImg){
+                    camMatrix = (cv::Mat_<float>(3,3)<<camm.fx, 0, camm.cx, 
+                                                        0, camm.fy, camm.cy,
+                                                        0 , 0, 1);
+                    distCoeffs = cv::Mat(5,1,CV_32F,camm.distortion);
+                    cv::undistort(img, img_calib, camMatrix, distCoeffs);
+                    img = img_calib.clone();
+                } else {
+                    img_calib = img.clone();
+                }
                 cv::Mat showImg = img.clone(), showImg_calib = img_calib.clone();
                 vector<Label> *Labels = pReader.getLabels(drawImgsNum + rec_start);
                 vector<cv::Rect> RectsOri;
                 if(Labels)
                     for (Label &lab : *Labels)
                     {
-                        //rectify lab
                         using namespace cv;
-                        std::vector<cv::Point2f> srcPoints,dstPoints;
-                        srcPoints.push_back(cv::Point2f(lab.position.x, lab.position.y));
-                        srcPoints.push_back(cv::Point2f(lab.position.x+lab.position.width, lab.position.y+lab.position.height));
-                        cv::undistortPoints(srcPoints,dstPoints,camMatrix,distCoeffs);
-                        dstPoints[0].x = dstPoints[0].x * camm.fx + camm.cx;
-                        dstPoints[0].y = dstPoints[0].y * camm.fy + camm.cy;
-                        dstPoints[1].x = dstPoints[1].x * camm.fx + camm.cx;
-                        dstPoints[1].y = dstPoints[1].y * camm.fy + camm.cy;
-                        lab.position.x = static_cast<int> (dstPoints[0].x);
-                        lab.position.y = static_cast<int> (dstPoints[0].y);
-                        lab.position.width = static_cast<int> (dstPoints[1].x - dstPoints[0].x);
-                        lab.position.height = static_cast<int> (dstPoints[1].y - dstPoints[0].y);
-                        if(lab.position.x < 0 || lab.position.y < 0 || dstPoints[1].x > img.cols || dstPoints[1].y > img.rows)
-                            continue;
+                        if(!undistortedImg){
+                            std::vector<cv::Point2f> srcPoints,dstPoints;
+                            srcPoints.push_back(cv::Point2f(lab.position.x, lab.position.y));
+                            srcPoints.push_back(cv::Point2f(lab.position.x+lab.position.width, lab.position.y+lab.position.height));
+                            cv::undistortPoints(srcPoints,dstPoints,camMatrix,distCoeffs);
+                            dstPoints[0].x = dstPoints[0].x * camm.fx + camm.cx;
+                            dstPoints[0].y = dstPoints[0].y * camm.fy + camm.cy;
+                            dstPoints[1].x = dstPoints[1].x * camm.fx + camm.cx;
+                            dstPoints[1].y = dstPoints[1].y * camm.fy + camm.cy;
+                            lab.position.x = static_cast<int> (dstPoints[0].x);
+                            lab.position.y = static_cast<int> (dstPoints[0].y);
+                            lab.position.width = static_cast<int> (dstPoints[1].x - dstPoints[0].x);
+                            lab.position.height = static_cast<int> (dstPoints[1].y - dstPoints[0].y);
+                            if(lab.position.x < 0 || lab.position.y < 0 || dstPoints[1].x > img.cols || dstPoints[1].y > img.rows)
+                                continue;
+                        }
                         cv::rectangle(showImg, lab.position, cv::Scalar(0,255,0), 1);
                         RectsOri.push_back(lab.position);
                         // cv::Rect lamp_calib = LampCalib(lab.position, img);
@@ -254,8 +261,8 @@ public:
                 }
                 resize(showImg, showImg, cv::Size(968, 768));
                 resize(showImg_calib, showImg_calib, cv::Size(968, 768));
-                cv::imshow("original", showImg);
-                //cv::imshow("rectified", showImg_calib);
+               // cv::imshow("original", showImg);
+                cv::imshow("rectified", showImg_calib);
 
                 //cv::moveWindow("video", 868, 0);
                 //imshow时间太短，movewindow好像没用，只好暂停手动调整下窗口位置便于录屏。
@@ -270,6 +277,9 @@ public:
         return 0;
     }
 public:
+    cv::Mat camMatrix;
+    cv::Mat distCoeffs;
+    bool undistortedImg;
     int rec_start;
     ParameterReader pReader;
     vector < Signal > vSignals;
@@ -284,7 +294,7 @@ int main(int argc, char** argv){
         return -1;
     }
     ParameterReader pReader(argv[1]);
-    RectCalib RC(pReader);
+    RectCalib RC(pReader, false);
     RC.run();
     return 0;
 }

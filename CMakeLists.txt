@@ -11,6 +11,6 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 # 增加opencv的依赖
 FIND_PACKAGE( OpenCV REQUIRED )
 include_directories( OPENCV_INCLUDE_DIRS)
-add_executable( calibLocation Calib.cc)
+add_executable( calibLocation CalibLight.cc)
 target_link_libraries( calibLocation 
     ${OpenCV_LIBS})
