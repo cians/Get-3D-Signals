@@ -53,11 +53,6 @@ public:
 	std::vector<Label> ObsLabels;
 
 };
-struct Point
-{
-	Eigen::Vector3f worldPosition;
-	unsigned char r, g, b, a;
-};
 
 class CamParams
 {
@@ -154,7 +149,7 @@ public:
 			int length = lineStr.length();
 			if (length < 12)
 				continue;
-			size_t posit = 4;//!Need change as your file format!!!
+			size_t posit = 4;                            //!Need change as your file format!!!
 			int frameId = stoi(lineStr.substr(posit, 5));//!Need change as your file format!!!
 			if (frameId < startId || frameId > endId)
 				continue;
@@ -174,6 +169,7 @@ public:
 			Labels1Frame.push_back(label);
 			LastFid = frameId;
 		}
+		printf("get %zd labelData!\n",LabelData.size());
 	}
 	void readTracjectory(string tPath)
 	{
@@ -189,7 +185,14 @@ public:
 		{
 			string line;
             getline(fin,line);
-			if(sscanf(line.c_str(), "%f %f %f %f %f %f %f %f", &tm, &linedata[0],&linedata[1],&linedata[2],
+	        if(sscanf(line.c_str(), "%f %f %f %f %f %f %f %f %f %f %f %f", &linedata[0],&linedata[1],&linedata[2],&linedata[3],&linedata[4],&linedata[5],
+                                                               &linedata[6],&linedata[7],&linedata[8],&linedata[9],&linedata[10],&linedata[11]) == 12)
+			{
+				Pose<<linedata[0],linedata[1],linedata[2],linedata[3],
+					linedata[4],linedata[5],linedata[6],linedata[7],
+					linedata[8],linedata[9],linedata[10],linedata[11];
+				trajectory.push_back(Pose);
+			} else if(sscanf(line.c_str(), "%f %f %f %f %f %f %f %f", &tm, &linedata[0],&linedata[1],&linedata[2],
                                     &linedata[3],&linedata[4],&linedata[5],&linedata[6]) == 8)
                                     //q0,     q1,      q2 ,     q3
 			{
@@ -214,6 +217,7 @@ public:
 				// center = Eigen::Vector3d(linedata[0],linedata[1],linedata[2]);
 				trajectory.push_back(Pose);
 			}
+
 		}
 	}
 	ParameterReader(){}
