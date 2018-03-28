@@ -151,7 +151,7 @@ public:
 			if (length < 12)
 				continue;
 			size_t posit = 4;                            //!Need change as your file format!!!
-			int frameId = stoi(lineStr.substr(posit, 5));//!Need change as your file format!!!
+			int frameId = stoi(lineStr.substr(posit, 6));//!Need change as your file format!!!
 			if (frameId < startId || frameId > endId)
 				continue;
 			std::stringstream lineStrStream;
@@ -181,7 +181,7 @@ public:
 		} 
 		float tm;
 		float linedata[12];
-        Eigen::Matrix<float,3,4> Pose;
+        Eigen::Matrix<float,4,4> Pose;
 		while (!fin.eof())
 		{
 			string line;
@@ -191,7 +191,8 @@ public:
 			{
 				Pose<<linedata[0],linedata[1],linedata[2],linedata[3],
 					linedata[4],linedata[5],linedata[6],linedata[7],
-					linedata[8],linedata[9],linedata[10],linedata[11];
+					linedata[8],linedata[9],linedata[10],linedata[11],
+					0,0,0,1;
 				trajectory.push_back(Pose);
 			} else if(sscanf(line.c_str(), "%f %f %f %f %f %f %f %f", &tm, &linedata[0],&linedata[1],&linedata[2],
                                     &linedata[3],&linedata[4],&linedata[5],&linedata[6]) == 8)
@@ -212,8 +213,8 @@ public:
 				Pose(1,3) = linedata[1];
 				Pose(2,3) = linedata[2];
 				// 0 0 0 1
-				// Pose(3,0) = Pose(3,1) = Pose(3,2) = 0;
-				// Pose(3,3) = 1;
+				Pose(3,0) = Pose(3,1) = Pose(3,2) = 0;
+				Pose(3,3) = 1;
 				// // center = -Pose.block<3,3>(0,0).transpose()*Pose.block<3,1>(0,3);
 				// center = Eigen::Vector3d(linedata[0],linedata[1],linedata[2]);
 				trajectory.push_back(Pose);
@@ -263,7 +264,7 @@ public:
 	}
 public:
 	std::unordered_map <string, string> paramsMap;//parameter.txt ÆäËû²ÎÊý
-	std::vector<Eigen::Matrix<float,3,4> > trajectory;//result
+	std::vector<Eigen::Matrix<float,4,4> > trajectory;//result
 	std::unordered_map<int,std::vector< Label>> LabelData;// may be need modify set to pointer;
 	CamParams camParams;
 };

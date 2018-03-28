@@ -9,6 +9,7 @@ public:
         traj_start = stoi(pReader.getData("traj_start"));
         lightw = stof(pReader.getData("light_width_half"));
         lighth = stof(pReader.getData("light_height_half"));
+        camm = pReader.camParams;
     }
     cv::Rect LampCalib(cv::Rect oriRect, cv::Mat img)
     {
@@ -55,7 +56,7 @@ public:
         //waitKey();
         return cv::Rect(myRect.x+epRect.x, myRect.y+epRect.y, myRect.width, myRect.height);
     }
-    vector<cv::Rect> updateSignals(int index, cv::Mat &CurImg)
+    vector<cv::Rect> updateSignals(int FrameID, cv::Mat &CurImg, Eigen::Matrix4f Twc)
     {
         vector<cv::Rect> SignalRects;
         for(size_t j = 0; j < vSignals.size(); ++j){
@@ -84,8 +85,9 @@ public:
                 {
                     auto label = vSignals[j].ObsLabels[i];
                     size_t ti = label.frameIndex - rec_start;
-                    Eigen::Matrix<float, 3, 4> CAM_P = pReader.camParams.INTRINSIC*pReader.trajectory[traj_start+ti];
-                    Eigen::Vector2i median(label.position.x+(int)(label.position.width/2), label.position.y+(int)(label.position.height/2)); 
+                    Eigen::Matrix<float, 3, 4> CAM_P = pReader.camParams.INTRINSIC*pReader.trajectory[traj_start+ti].block<3,4>(0,0);
+                    Eigen::Vector2i median(label.position.x+(label.position.width>>1), label.position.y+(label.position.height>>1)); 
+
                     Tl.block<1, 3>(2*i, 0) = CAM_P.block<1, 3>(0, 0) - median(0) * CAM_P.block<1, 3>(2, 0);
                     Tl.block<1, 3>(2*i+1, 0) = CAM_P.block<1, 3>(1, 0) - median(1) * CAM_P.block<1, 3>(2, 0);
                     pl(2 * i) = CAM_P(0, 3) - median(0) * CAM_P(2, 3);
@@ -100,30 +102,39 @@ public:
                     // Tr.block<1, 3>(2*i+1, 0) = CAM_P.block<1, 3>(1, 0) - rightd(1) * CAM_P.block<1, 3>(2, 0);
                     // pr(2 * i) = CAM_P(0, 3) - rightd(0) * CAM_P(2, 3);
                     // pr(2*i+1) = CAM_P(1, 3) - rightd(1) * CAM_P(2, 3);
-
                 }
-                Eigen::Vector3f medpos = (Tl.transpose()*Tl).colPivHouseholderQr().solve(-Tl.transpose()*pl);
-               // printf(" =a light : %f %f %f = ", medpos(0),medpos(1), medpos(2));
+                Eigen::Vector3f medpos = (Tl.transpose()*Tl). colPivHouseholderQr().solve(-Tl.transpose()*pl);
+                printf(" light : %f %f %f \n", medpos(0),medpos(1), medpos(2));
+
                 //Eigen::Vector3f leftpos = (Tl.transpose()*Tl).colPivHouseholderQr().solve(-Tl.transpose()*pl);
                 // Eigen::Vector3f rightpos =  (Tr.transpose()*Tr).colPivHouseholderQr().solve(-Tr.transpose()*pr);
                 //printf("leftu: %f %f %f, rightd: %f %f %f\n",leftpos(0),leftpos(1),leftpos(2),rightpos(0),rightpos(1),rightpos(2));
                 //TODO:灯的实际大小应该是个固定值。。。
                 Eigen::Vector3f leftpos(medpos(0)-lightw, medpos(1)-lighth, medpos(2));
                 Eigen::Vector3f rightpos(medpos(0)+lightw, medpos(1)+lighth, medpos(2));
+                float errors = 0;
+                for(size_t i = 0; i < obsNum; ++i){
+                     auto cam_p = pReader.camParams.INTRINSIC*pReader.trajectory[vSignals[j].ObsLabels[i].frameIndex].block<3,4>(0,0);
+                     Eigen::Vector3f re_p = cam_p.block<3,3>(0,0)*medpos + cam_p.block<3,1>(0,3);
+                     Eigen::Vector2i re_pi((int)(re_p(0)/re_p(2)),(int)(re_p(1)/re_p(2)));
+                     errors = abs(re_pi(0) - vSignals[j].ObsLabels[i].position.x - (vSignals[j].ObsLabels[i].position.width>>1)) +
+                            abs(re_pi(1) - vSignals[j].ObsLabels[i].position.y - (vSignals[j].ObsLabels[i].position.height>>1));
+                    printf("| errors: %f", errors);
+                }
                 vSignals[j].LeftUpPos = leftpos;
                 vSignals[j].RightDownPos = rightpos;
                 //投影回来。
-                Eigen::Vector3f CamBack = pReader.trajectory[traj_start+index].block<3,1>(0,2);
-                Eigen::Vector3f c2l = medpos + pReader.trajectory[traj_start+index].block<3,1>(0,3);//因为traj是正的，是0到N帧的变换。所以取反方向再相减。
-                if (c2l.dot(CamBack)/(c2l.norm()*CamBack.norm()) > -0.2 && (int)vSignals[j].ObsLabels[obsNum-1].frameIndex + 5 < rec_start+index ){
+                Eigen::Vector3f CamBack =Twc.block<3,1>(0,2);
+                Eigen::Vector3f c2l = medpos +Twc.block<3,1>(0,3);//因为traj是正的，是0到N帧的变换。所以取反方向再相减。
+                if (c2l.dot(CamBack)/(c2l.norm()*CamBack.norm()) > -0.2 && (int)vSignals[j].ObsLabels[obsNum-1].frameIndex + 5 < FrameID ){
                     printf("a passed lamp|\n");
                     vSignals[j].trackStatus = "passed";
                     continue;
                 }
-                auto cam_p = pReader.camParams.INTRINSIC*pReader.trajectory[traj_start+index];
+                auto cam_p = pReader.camParams.INTRINSIC*Twc.block<3,4>(0,0);
                 curRect = reproject2img(leftpos,rightpos,cam_p);
                // curRect = LampCalib(curRect,CurImg);
-                if(vSignals[j].ObsLabels[obsNum-1].frameIndex < (size_t)index+rec_start)
+                if(vSignals[j].ObsLabels[obsNum-1].frameIndex < (size_t)FrameID)
                     SignalRects.push_back(curRect);
                 else
                     SignalRects.push_back(vSignals[j].CurFrameRect);
@@ -149,28 +160,13 @@ public:
         return curRect;
     }
 
-    vector<cv::Rect> RebuildLamp (int index, cv::Mat& CurImg)
+    void label2signal (int FrameID,  vector<Label> *Labels)
     {
         vector<cv::Rect> LastLampRects;
-        // for(size_t i = 0; i < vSignals.size(); ++i){//投影当前三维灯到图像上来
-        //     if(vSignals[i].ObsLabels.size() > 3){
-        //         Eigen::Vector3f CamBack = pReader.trajectory[traj_start+index].block<3,1>(0,2);
-        //         Eigen::Vector3f c2l = vSignals[i].LeftUpPos + pReader.trajectory[traj_start+index].block<3,1>(0,3);
-        //       //  printf(" cos@: %f ",c2l.dot(CamBack)/(c2l.norm()*CamBack.norm()));
-        //         if (c2l.dot(CamBack)/(c2l.norm()*CamBack.norm()) > -0.2)
-        //             continue;
-        //         auto cam_p = pReader.camParams.INTRINSIC*pReader.trajectory[traj_start+index];
-        //         cv::Rect curRect = reproject2img(vSignals[i].LeftUpPos,vSignals[i].RightDownPos,cam_p);
-        //         vSignals[i].CurFrameRect = curRect;
-        //         LastLampRects.push_back(curRect);
-        //     }
-        // }
-      //  
-        if(pReader.getLabels(index+rec_start)){ 
+        if(Labels){ 
             // 有lable的话判断label归类。
-            vector<Label> *Labels = pReader.getLabels(index+rec_start);       
-            for(size_t li = 0; li < Labels->size(); ++li){
-                Label &label = (*Labels)[li];
+          //  vector<Label> *Labels = pReader.getLabels(FrameID);       
+            for (Label &label : *Labels){
                 bool NoParent = true;
                 // 把现存的signal 投过来，比对。
                 for (size_t i = 0; i < vSignals.size(); ++i){
@@ -185,39 +181,64 @@ public:
                             break;
                        }
                 }
-                // 如果没找到，与上一帧中的label 匹配，可能归到passed signal里了？？
-                // if(index > 0 && NoParent) {
-                //     vector<Label> *OldLabels = pReader.getLabels(index-1+rec_start);
-                //     if(OldLabels)
-                //     for (size_t oi = 0; oi < OldLabels->size() && NoParent;++oi){
-                //         Label &oldlab = (*OldLabels)[oi];
-                //         if((float)abs(oldlab.position.x + (oldlab.position.width>>1) - label.position.x - (label.position.width>>1))< 1*label.position.width &&
-                //             (float)abs(oldlab.position.y + (oldlab.position.height>>1) - label.position.y - (label.position.height>>1))< 1*label.position.height){
-                //                 NoParent = false;
-                //                 //加入队列
-                //                 label.SID = oldlab.SID;
-                //                 vSignals[oldlab.SID].ObsLabels.push_back(label);
-                //                 break;
-                //             }
-                //     }
-                // }
-                // } 
-               if(NoParent){
+                if(NoParent){
                    //当做新来的灯。
                    printf("new a signal!\n");
                    Signal signal;
-                   signal.startFrame = index;
+                   signal.startFrame = FrameID;
                    signal.SID = (int)vSignals.size();
                    label.SID = signal.SID;// LabelData 里没有生效
                    signal.ObsLabels.push_back(label);
                    signal.CurFrameRect = label.position;
                    signal.speed = Eigen::Vector2i(0, 0);
                    vSignals.push_back(signal);
-               }
+                }
             }
         }
-        auto LampRects = updateSignals(index, CurImg);
-        return LampRects;
+    }
+    void runOnce(cv::Mat img, Eigen::Matrix4f Twc, int FrameID, vector<Label> *Labels)
+    {
+        cv::Mat img_light = img.clone();
+        vector<cv::Rect> RectsOri;
+        if(Labels)
+            for (Label &lab : *Labels)
+                {
+                    using namespace cv;
+                    if(!undistortedImg)
+                    {
+                        std::vector<cv::Point2f> srcPoints,dstPoints;
+                        srcPoints.push_back(cv::Point2f(lab.position.x, lab.position.y));
+                        srcPoints.push_back(cv::Point2f(lab.position.x+lab.position.width, lab.position.y+lab.position.height));
+                        cv::undistortPoints(srcPoints,dstPoints,camMatrix,distCoeffs);
+                        dstPoints[0].x = dstPoints[0].x * camm.fx + camm.cx;
+                        dstPoints[0].y = dstPoints[0].y * camm.fy + camm.cy;
+                        dstPoints[1].x = dstPoints[1].x * camm.fx + camm.cx;
+                        dstPoints[1].y = dstPoints[1].y * camm.fy + camm.cy;
+                        lab.position.x = static_cast<int> (dstPoints[0].x);
+                        lab.position.y = static_cast<int> (dstPoints[0].y);
+                        lab.position.width = static_cast<int> (dstPoints[1].x - dstPoints[0].x);
+                        lab.position.height = static_cast<int> (dstPoints[1].y - dstPoints[0].y);
+                        if(lab.position.x < 0 || lab.position.y < 0 || dstPoints[1].x > img.cols || dstPoints[1].y > img.rows)
+                            continue;
+                    }
+                    rectangle(img, lab.position, cv::Scalar(0,255,0), 1);
+                    RectsOri.push_back(lab.position);
+                    // cv::Rect lamp_calib = LampCalib(lab.position, img);
+                    // cv::rectangle(img, lamp_calib, cv::Scalar(0,0,255), 2);
+                }
+            label2signal(FrameID, Labels);
+            vector <cv::Rect> Rects = updateSignals(FrameID, img, Twc);
+            //if(Rects.size() == 0) Rects = RectsOri;
+            for(auto rect : Rects)
+            {
+                cv::rectangle(img_light,rect,cv::Scalar(255,0,0),2);
+            }
+        //resize(img, img, cv::Size(968, 768));
+        //resize(img_light, img_light, cv::Size(968, 768));
+        cv::imshow("original", img);
+        cv::imshow("rectified", img_light);
+        cv::waitKey(100);
+
     }
     int run()
     {
@@ -228,18 +249,17 @@ public:
         rec_start = stoi(pReader.getData("rec_start"));
         while(drawImgsNum < 600){
                 //一帧帧显示图像
-                cv::Mat img,img_calib;	
+                cv::Mat img, img_calib;	
                 //imgShowSeque >> img;
                 std::stringstream numberss;
-                numberss << std::setw(5) << std::setfill('0') << rec_start+drawImgsNum; // 0000, 0001, 0002, etc...
-                std::string name = img_path + "157_" +numberss.str() + ".png";
-                // numberss << std::setw(6) << std::setfill('0') << rec_start+drawImgsNum; // 0000, 0001, 0002, etc...
-                // std::string name = img_path + numberss.str() + ".png";
+                // numberss << std::setw(5) << std::setfill('0') << rec_start+drawImgsNum; // 0000, 0001, 0002, etc...
+                // std::string name = img_path + "157_" +numberss.str() + ".png";
+                numberss << std::setw(6) << std::setfill('0') << rec_start+drawImgsNum; // 0000, 0001, 0002, etc...
+                std::string name = img_path + numberss.str() + ".png";
                 
                 img = cv::imread(name);
                 if (img.empty())
                     return 0;
-                auto camm = pReader.camParams;
                 if (!undistortedImg){
                     camMatrix = (cv::Mat_<float>(3,3)<<camm.fx, 0, camm.cx, 
                                                         0, camm.fy, camm.cy,
@@ -250,50 +270,12 @@ public:
                 } else {
                     img_calib = img.clone();
                 }
-                cv::Mat showImg = img.clone(), showImg_calib = img_calib.clone();
-                if(1){
-                    vector<Label> *Labels = pReader.getLabels(drawImgsNum + rec_start);
-                    vector<cv::Rect> RectsOri;
-                    if(Labels)
-                        for (Label &lab : *Labels)
-                        {
-                            using namespace cv;
-                            if(!undistortedImg){
-                                std::vector<cv::Point2f> srcPoints,dstPoints;
-                                srcPoints.push_back(cv::Point2f(lab.position.x, lab.position.y));
-                                srcPoints.push_back(cv::Point2f(lab.position.x+lab.position.width, lab.position.y+lab.position.height));
-                                cv::undistortPoints(srcPoints,dstPoints,camMatrix,distCoeffs);
-                                dstPoints[0].x = dstPoints[0].x * camm.fx + camm.cx;
-                                dstPoints[0].y = dstPoints[0].y * camm.fy + camm.cy;
-                                dstPoints[1].x = dstPoints[1].x * camm.fx + camm.cx;
-                                dstPoints[1].y = dstPoints[1].y * camm.fy + camm.cy;
-                                lab.position.x = static_cast<int> (dstPoints[0].x);
-                                lab.position.y = static_cast<int> (dstPoints[0].y);
-                                lab.position.width = static_cast<int> (dstPoints[1].x - dstPoints[0].x);
-                                lab.position.height = static_cast<int> (dstPoints[1].y - dstPoints[0].y);
-                                if(lab.position.x < 0 || lab.position.y < 0 || dstPoints[1].x > img.cols || dstPoints[1].y > img.rows)
-                                    continue;
-                            }
-                            cv::rectangle(showImg, lab.position, cv::Scalar(0,255,0), 1);
-                            RectsOri.push_back(lab.position);
-                            // cv::Rect lamp_calib = LampCalib(lab.position, img);
-                            // cv::rectangle(showImg, lamp_calib, cv::Scalar(0,0,255), 2);
-                        }
-                    auto Rects = RebuildLamp(drawImgsNum, img);
-                    //if(Rects.size() == 0) Rects = RectsOri;
-                    for(auto rect : Rects)
-                    {
-                        cv::rectangle(showImg_calib,rect,cv::Scalar(255,0,0),2);
-                    }
-                }
-                resize(showImg, showImg, cv::Size(968, 768));
-                resize(showImg_calib, showImg_calib, cv::Size(968, 768));
-                //cv::imshow("original", showImg);
-                cv::imshow("rectified", showImg_calib);
+                //cv::Mat showImg = img.clone(), showImg_calib = img_calib.clone();
+                vector<Label> *Labels = pReader.getLabels(drawImgsNum + rec_start);
+                Eigen::Matrix4f Twc = pReader.trajectory[traj_start + drawImgsNum];
 
-                //cv::moveWindow("video", 868, 0);
-                //imshow时间太短，movewindow好像没用，只好暂停手动调整下窗口位置便于录屏。
-                // if (drawImgsNum < 1)
+                runOnce(img_calib, Twc, rec_start+drawImgsNum, Labels);
+
                 char presskey = cv::waitKey(200);
                 if(presskey == 'p') playvideo = !playvideo;
                 if(playvideo){
@@ -310,6 +292,7 @@ public:
     float lightw,lighth; 
     int rec_start,traj_start;
     ParameterReader pReader;
+    CamParams camm;
     vector < Signal > vSignals;
 };
 
