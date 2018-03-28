@@ -48,6 +48,7 @@ public:
 	string trackStatus;
 	Eigen::Vector3f LeftUpPos;
 	Eigen::Vector3f RightDownPos;
+	Eigen::Vector2i speed;
 	cv::Rect CurFrameRect;
 	unsigned char r, g, b, a;
 	std::vector<Label> ObsLabels;
