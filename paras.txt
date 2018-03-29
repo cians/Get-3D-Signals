@@ -1,27 +1,44 @@
 #参数文件，等号“=”附近不要加空格
-#label_path=/home/sensetime/Downloads/GOD/label_157_part.txt
-#img_path=/home/sensetime/Downloads/GOD/img_157_part/
-#trajectroy_path=/home/sensetime/Downloads/GOD/157partTrajectory.txt
-#rec_start=1936
-#rec_end=2900
-#traj_start=36
-#isUndistorted=no
-#light_width_half=0.02
-#light_height_half=0.04
-##内参
-#fx=1941.45
-#fy=1945.9
-#cx=957.207
-#cy=611.806
-#distortion=-0.43019551038 0.191070362 0 0 0 
+label_path=/home/sensetime/Downloads/GOD/label_157_part.txt
+img_path=/home/sensetime/Downloads/GOD/img_157_part/
+trajectroy_path=/home/sensetime/Downloads/GOD/157partTrajectory.txt
+rec_start=1936
+rec_end=2900
+traj_start=36
+isUndistorted=no
+light_width_half=0.02
+light_height_half=0.04
+#内参
+fx=1941.45
+fy=1945.9
+cx=957.207
+cy=611.806
+distortion=-0.43019551038 0.191070362 0 0 0 
+
 #当切换到kitti，需要修改1.undistorted 2.read img 接口 3. read label 接口
+#kitti 03
+#label_path=/home/sensetime/Downloads/dataset/sequences/04/label.txt
+#img_path=/home/sensetime/Downloads/dataset/sequences/04/image_0/
+#trajectroy_path=/home/sensetime/Downloads/dataset/poses/04.txt
+#rec_start=190
+#rec_end=270
+#traj_start=190
+#isUndistorted=yes
+#light_width_half=0.2
+#light_height_half=0.4
+#fx=707.0912
+#fy=707.0912
+#cx=601.8873
+#cy=183.1104
+#distortion=0 0 0 0 0 
+
 #kitti 04
 label_path=/home/sensetime/Downloads/dataset/sequences/04/label.txt
 img_path=/home/sensetime/Downloads/dataset/sequences/04/image_0/
-trajectroy_path=/home/sensetime/Downloads/dataset/sequences/04/CameraTrajectory.txt
-rec_start=190
+trajectroy_path=/home/sensetime/Downloads/dataset/poses/04.txt
+rec_start=180
 rec_end=270
-traj_start=190
+traj_start=180
 isUndistorted=yes
 light_width_half=0.2
 light_height_half=0.4
