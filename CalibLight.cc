@@ -137,15 +137,19 @@ public:
                 vSignals[j].LeftUpPos = leftpos;
                 vSignals[j].RightDownPos = rightpos;
                 //投影回来。
-                Eigen::Vector3f CamBack =Tcw.block<3,1>(0,2);
-                Eigen::Vector3f c2l = medpos +Tcw.block<3,1>(0,3);//因为traj是正的，是0到N帧的变换。所以取反方向再相减。
-                // if (c2l.dot(CamBack)/(c2l.norm()*CamBack.norm()) > 0.3 && (int)vSignals[j].ObsLabels[obsNum-1].frameIndex + 5 < FrameID ){
-                //     printf("a passed lamp|\n");
-                //     vSignals[j].trackStatus = "passed";
-                //     continue;
-                // }
+                Eigen::Vector3f CamBack =Tcw.inverse().block<3,1>(0,2);
+                Eigen::Vector3f c2l = medpos -Tcw.inverse().block<3,1>(0,3);//因为traj是正的，是0到N帧的变换。所以取反方向再相减。
+                //printf("cons %f  %f ",c2l.dot(CamBack)/(c2l.norm()*CamBack.norm()), CamBack(2));
+                if (c2l.dot(CamBack)/(c2l.norm()*CamBack.norm()) < 0.1 ){
+                    printf("a passed lamp|\n");
+                    vSignals[j].trackStatus = "passed";
+                    continue;
+                } 
                 auto cam_p = pReader.camParams.INTRINSIC*Tcw.block<3,4>(0,0);
                 curRect = reproject2img(leftpos,rightpos,cam_p);
+                // if ((curRect.width < 4 && curRect.height < 8) || (curRect.width > 30 && curRect.height > 60)){
+                //     continue;
+                // }
                // curRect = LampCalib(curRect,CurImg);
                 if(vSignals[j].ObsLabels[obsNum-1].frameIndex < (size_t)FrameID)
                     vSignals[j].CurFrameRect = curRect;
@@ -233,7 +237,7 @@ public:
                         if(lab.position.x < 0 || lab.position.y < 0 || dstPoints[1].x > img.cols || dstPoints[1].y > img.rows)
                             continue;
                     }
-                    rectangle(img, lab.position, cv::Scalar(0,255,0), 1);
+                    rectangle(img, lab.position, cv::Scalar(0,255,0), 2);
                     RectsOri.push_back(lab.position);
                     // cv::Rect lamp_calib = LampCalib(lab.position, img);
                     // cv::rectangle(img, lamp_calib, cv::Scalar(0,0,255), 2);
@@ -243,7 +247,7 @@ public:
             //if(Rects.size() == 0) Rects = RectsOri;
             for(auto rect : Rects)
             {
-                cv::rectangle(img_light,rect,cv::Scalar(255,0,0),2);
+                cv::rectangle(img_light,rect,cv::Scalar(0,0,255),2);
             }
        //  resize(img, img, cv::Size(968, 768));
       //  resize(img_light, img_light, cv::Size(968, 768));
