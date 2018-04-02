@@ -1,6 +1,6 @@
 /*!
  * @brief 
- * the project is aiming to triangulate the traffic signals with known camera pose and signals' image coordinates.
+ * this project is aiming to triangulate the traffic signals with known camera pose and signals' image coordinates.
  * @file CalibLight.cc
  * @author CaoJian
  * @date 2018-04-02

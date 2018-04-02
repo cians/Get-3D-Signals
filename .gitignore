@@ -2,3 +2,6 @@ build/
 .vscode/
 *~
 .gitignore
+cpplint.py
+styleCheck.sh
+styleFormat.sh
