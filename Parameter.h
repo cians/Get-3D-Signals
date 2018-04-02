@@ -1,9 +1,17 @@
-#pragma once
-#ifndef _PARAMETER_H_
-#define _PARAMETER_H_
+/*!
+ * @brief 
+ * the project is aiming to triangulate the traffic signals with known camera pose and signals' image coordinates.
+ * @file Parameter.h
+ * @author CaoJian
+ * @date 2018-04-02
+ */
+#ifndef _GOD_PARAMETERR_H_
+#define _GOD_PARAMETERR_H_
+#include <cstdio>
 #include <fstream>
 #include <string>
 #include <iostream>
+#include <vector>
 #include <iomanip>
 #include <unordered_map>
 #include "Eigen/Eigen"
@@ -15,20 +23,18 @@
 #include <opencv2/core/eigen.hpp>
 
 using std::string;
-using std::vector;
 using std::cout;
 using std::cerr;
 using std::endl;
 
-struct Label
-{
+struct Label{
 	int SID;
 	size_t frameIndex;
 	cv::Rect position;
 	string color;
 };
-class Signal
-{
+
+class Signal{
 public:
 	Signal() {
 		color = "white";
@@ -55,14 +61,12 @@ public:
 
 };
 
-class CamParams
-{
-   public:
+class CamParams{
+public:
 	float fx, fy, cx, cy;
 	Eigen::Matrix3f INTRINSIC;
 	float distortion[5];
-	void fill_INTRINSIC()
-	{
+	void fill_INTRINSIC(){
 		INTRINSIC = Eigen::Matrix3f::Identity();
 		INTRINSIC(0, 0) = fx;
 		INTRINSIC(1, 1) = fy;
@@ -70,25 +74,20 @@ class CamParams
 		INTRINSIC(1, 2) = cy;
 	}
 };
-class ParameterReader
-{
+/*!
+ * @brief 
+ * ParameterReader will read parameters.txt and then record camera intrinsic、camera pose、traffic signal label data etc...
+ */
+class ParameterReader{
 public:
-	//void readLine(std::ifstream &fin, float &value);
-	//void readSignal(std::ifstream &fin, string sname);
-	//void readCamIntrinsic(std::ifstream &fin, string fx_value);
-	//string getData(string key);
-	//void readLabel(string path);
-	//vector<Label> getLabels(int frameIndex);
-	std::vector<Label>* getLabels(int frameIndex)
-	{
+	std::vector<Label>* getLabels(int frameIndex){
 		auto iter = LabelData.find(frameIndex);
 		if (iter == LabelData.end())
 			return nullptr;
 		else
 			return &(iter->second);
 	}
-	void readLine(std::ifstream &fin, float &value)
-	{
+	void readLine(std::ifstream &fin, float &value){
 		string LineStr;
 		getline(fin, LineStr);
 		int pos = LineStr.find("=");
@@ -97,8 +96,7 @@ public:
 		string key = LineStr.substr(0, pos);
 		value = stof(LineStr.substr(pos + 1, LineStr.length()));
 	}
-	void readCamIntrinsic(std::ifstream &fin, string fx_value)
-	{
+	void readCamIntrinsic(std::ifstream &fin, string fx_value){
 		camParams.fx = stof(fx_value);
 		string fyLine, cxLine, cyLine, distLine;
 		string key, value;
@@ -122,8 +120,7 @@ public:
 		printf("Get camera intrinsic !\n");
 	}
 
-	string getData(string key)
-	{
+	string getData(string key){
 		std::unordered_map <string, string>::iterator iter = paramsMap.find(key);
 		if (iter == paramsMap.end())
 		{
@@ -132,8 +129,7 @@ public:
 		}
 		return iter->second; //second is the value, first is the key
 	}
-	void readLabel(string path)
-	{
+	void readLabel(string path){
 		//std::cout<<"/home/sensetime/Downloads/GOD/label_157_part.txt"<<endl
 		std::ifstream fin(path);
 		if (!fin.is_open()){
@@ -172,8 +168,7 @@ public:
 		}
 		printf("get %zd labelData!\n",LabelData.size());
 	}
-	void readTracjectory(string tPath)
-	{
+	void readTracjectory(string tPath){
 		std::ifstream fin(tPath);
 		if(!fin.is_open()){
 			std::cerr<<"failed to load tracjectory!\n";
@@ -182,22 +177,19 @@ public:
 		float tm;
 		float linedata[12];
         Eigen::Matrix<float,4,4> Pose;
-		while (!fin.eof())
-		{
+		while (!fin.eof()){
 			string line;
             getline(fin,line);
 	        if(sscanf(line.c_str(), "%f %f %f %f %f %f %f %f %f %f %f %f", &linedata[0],&linedata[1],&linedata[2],&linedata[3],&linedata[4],&linedata[5],
-                                                               &linedata[6],&linedata[7],&linedata[8],&linedata[9],&linedata[10],&linedata[11]) == 12)
-			{
+                                                               &linedata[6],&linedata[7],&linedata[8],&linedata[9],&linedata[10],&linedata[11]) == 12){
 				Pose<<linedata[0],linedata[1],linedata[2],linedata[3],
 					linedata[4],linedata[5],linedata[6],linedata[7],
 					linedata[8],linedata[9],linedata[10],linedata[11],
 					0,0,0,1;
 				trajectory.push_back(Pose);
 			} else if(sscanf(line.c_str(), "%f %f %f %f %f %f %f %f", &tm, &linedata[0],&linedata[1],&linedata[2],
-                                    &linedata[3],&linedata[4],&linedata[5],&linedata[6]) == 8)
+                                    &linedata[3],&linedata[4],&linedata[5],&linedata[6]) == 8){
                                     //q0,     q1,      q2 ,     q3
-			{
 				//quaternion ->R
 				Pose(0,0) = 1 - 2*linedata[5]*linedata[5] - 2*linedata[6]*linedata[6];
 				Pose(0,1) = 2*linedata[4]*linedata[5] + 2*linedata[3]*linedata[6];
@@ -219,43 +211,38 @@ public:
 				// center = Eigen::Vector3d(linedata[0],linedata[1],linedata[2]);
 				trajectory.push_back(Pose);
 			}
-
 		}
 	}
 	ParameterReader(){}
-	ParameterReader(string pFile)
-	{
+	ParameterReader(string pFile){
 		std::ifstream fin(pFile.c_str());
-		if (!fin)
-		{
+		if (!fin){
 			std::cerr << "parameter file missed\n";
 			return;
 		}
-		while (!fin.eof())
-		{
+		while (!fin.eof()){
 			string lineStr;
 			getline(fin, lineStr);
-			if (lineStr[0] == '#')
-			{
+			if (lineStr[0] == '#'){
 				continue;
 			}
 			int pos = lineStr.find("=");
-			if (pos == -1)
+			if (pos == -1){
 				continue;
+			}
 			string key = lineStr.substr(0, pos);
 			string value = lineStr.substr(pos + 1, lineStr.length()-pos-1);
-			if(value[value.size()-1] == 13)//去除换行
-			{
+			if(value[value.size()-1] == 13){//去掉换行符
 				value.pop_back();
 			}
 			paramsMap[key] = value;
-			if (key == "fx")
-			{
+			if (key == "fx"){
 				readCamIntrinsic(fin, value);
 			}
 			//include all bad situations
-			if (!fin.good())
+			if (!fin.good()){
 				break;
+			}
 		}
 		readLabel(getData("label_path"));
 		printf("collected %zd paras\n",paramsMap.size());
@@ -263,11 +250,10 @@ public:
 		printf("loaded tracjectory total %zd frame \n",trajectory.size());
 	}
 public:
-	std::unordered_map <string, string> paramsMap;//parameter.txt ÆäËû²ÎÊý
-	std::vector<Eigen::Matrix<float,4,4> > trajectory;//result
-	std::unordered_map<int,std::vector< Label>> LabelData;// may be need modify set to pointer;
-	CamParams camParams;
+	std::unordered_map <string, string> paramsMap;///parameters  
+	std::vector<Eigen::Matrix<float,4,4> > trajectory;// camera trajectory
+	std::unordered_map<int,std::vector< Label>> LabelData;// Labeldata for each frame;
+	CamParams camParams; //camera intrinsic
 };
 
-
-#endif // _PARAMETER_H_
+#endif // _GOD_PARAMETERR_H_

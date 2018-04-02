@@ -1,3 +1,10 @@
+/*!
+ * @brief 
+ * the project is aiming to triangulate the traffic signals with known camera pose and signals' image coordinates.
+ * @file CalibLight.cc
+ * @author CaoJian
+ * @date 2018-04-02
+ */
 #include "Parameter.h"
 
 class RectCalib
@@ -11,54 +18,56 @@ public:
         lighth = stof(pReader.getData("light_height_half"));
         camm = pReader.camParams;
     }
-    cv::Rect LampCalib(cv::Rect oriRect, cv::Mat img)
-    {
-        using namespace cv;
-        if(oriRect.width < 20 && oriRect.height < 40)
-            return oriRect;
-        int expand = 6;
-        cv::Rect epRect(max(0,oriRect.x-expand), max(0,oriRect.y-expand), oriRect.width + 2*expand, oriRect.height+2*expand);
-        epRect.width = epRect.x+epRect.width > img.cols ? img.cols-epRect.x : epRect.width;
-        epRect.height = epRect.y+epRect.height > img.rows ? img.rows-epRect.height : epRect.height;
-        cv::Mat img_cand = img(epRect);
-        blur( img_cand, img_cand, Size(3,3));
-        // imshow("tmp",img_cand);
-        // waitKey();
-        Mat src_gray;
-        cvtColor( img_cand, src_gray, COLOR_BGR2GRAY );
-    // Mat threshold_output;
-    //  vector<vector<cv::Point> > contours;
-    //  vector<Vec4i> hierarchy;
-        //threshold( src_gray, threshold_output, 100, 255, THRESH_BINARY );
-        Canny(src_gray, src_gray, 50, 100);
-        //imshow("sss",src_gray);
-        //保留1/4的角落
-        //int splitc = (int)(0.25 * src_gray.cols);
-        int splitr = (int)(0.25 * src_gray.rows);
-    // src_gray.colRange(splitc, src_gray.cols-splitc).setTo(0);
-        src_gray.rowRange(splitr, src_gray.rows-splitr).setTo(0);
-        // findContours( src_gray, contours, hierarchy, CV_RETR_EXTERNAL, CHAIN_APPROX_SIMPLE, cv::Point(0, 0) );
-        //imshow("sss",src_gray);
-        // Mat imageContours=Mat::zeros(src_gray.size(),CV_8UC1);
-        // for( size_t i = 0; i< contours.size(); i++ )
-        // {
-        //     drawContours( imageContours, contours, (int)i, Scalar(255), 1, 8, hierarchy);
-        // }
-        //  imshow("tmp",imageContours);
-        cv::Rect myRect= boundingRect(src_gray);  
-    // cv::rectangle(img_cand, myRect, Scalar(255,0,0),2); 
-        //cv::rectangle(img_cand, oriRect, Scalar(0,255,0),2);
-    // imshow("tmp2",img_cand);
-    if(myRect.height < myRect.width || myRect.height < 20)
-            myRect.height = oriRect.height;
-    if(myRect.width < 10)
-            myRect.width = oriRect.width;
-        //waitKey();
-        return cv::Rect(myRect.x+epRect.x, myRect.y+epRect.y, myRect.width, myRect.height);
-    }
-    vector<cv::Rect> updateSignals(int FrameID, cv::Mat &CurImg, Eigen::Matrix4f Tcw)
-    {
-        vector<cv::Rect> SignalRects;
+    /*!
+    *this function(LampCalib) is designed to calibrate the lamp's rectangle, but is abandoned now because of its poor robustness...
+    */
+    // cv::Rect LampCalib(cv::Rect oriRect, cv::Mat img)
+    // {
+    //     using namespace cv;
+    //     if(oriRect.width < 20 && oriRect.height < 40)
+    //         return oriRect;
+    //     int expand = 6;
+    //     cv::Rect epRect(max(0,oriRect.x-expand), max(0,oriRect.y-expand), oriRect.width + 2*expand, oriRect.height+2*expand);
+    //     epRect.width = epRect.x+epRect.width > img.cols ? img.cols-epRect.x : epRect.width;
+    //     epRect.height = epRect.y+epRect.height > img.rows ? img.rows-epRect.height : epRect.height;
+    //     cv::Mat img_cand = img(epRect);
+    //     blur( img_cand, img_cand, Size(3,3));
+    //     // imshow("tmp",img_cand);
+    //     // waitKey();
+    //     Mat src_gray;
+    //     cvtColor( img_cand, src_gray, COLOR_BGR2GRAY );
+    //     // Mat threshold_output;
+    //     //  std::vector<std::vector<cv::Point> > contours;
+    //     //  std::vector<Vec4i> hierarchy;
+    //     //threshold( src_gray, threshold_output, 100, 255, THRESH_BINARY );
+    //     Canny(src_gray, src_gray, 50, 100);
+    //     //imshow("sss",src_gray);
+    //     //保留1/4的角落
+    //     //int splitc = (int)(0.25 * src_gray.cols);
+    //     int splitr = (int)(0.25 * src_gray.rows);
+    // // src_gray.colRange(splitc, src_gray.cols-splitc).setTo(0);
+    //     src_gray.rowRange(splitr, src_gray.rows-splitr).setTo(0);
+    //     // findContours( src_gray, contours, hierarchy, CV_RETR_EXTERNAL, CHAIN_APPROX_SIMPLE, cv::Point(0, 0) );
+    //     //imshow("sss",src_gray);
+    //     // Mat imageContours=Mat::zeros(src_gray.size(),CV_8UC1);
+    //     // for( size_t i = 0; i< contours.size(); i++ )
+    //     // {
+    //     //     drawContours( imageContours, contours, (int)i, Scalar(255), 1, 8, hierarchy);
+    //     // }
+    //     //  imshow("tmp",imageContours);
+    //     cv::Rect myRect= boundingRect(src_gray);  
+    // // cv::rectangle(img_cand, myRect, Scalar(255,0,0),2); 
+    //     //cv::rectangle(img_cand, oriRect, Scalar(0,255,0),2);
+    // // imshow("tmp2",img_cand);
+    // if(myRect.height < myRect.width || myRect.height < 20)
+    //         myRect.height = oriRect.height;
+    // if(myRect.width < 10)
+    //         myRect.width = oriRect.width;
+    //     //waitKey();
+    //     return cv::Rect(myRect.x+epRect.x, myRect.y+epRect.y, myRect.width, myRect.height);
+    // }
+    std::vector<cv::Rect> updateSignals(int FrameID, cv::Mat &CurImg, Eigen::Matrix4f Tcw){
+        std::vector<cv::Rect> SignalRects;
         for(size_t j = 0; j < vSignals.size(); ++j){
             cv::Rect curRect;
             const size_t obsNum = vSignals[j].ObsLabels.size();
@@ -81,8 +90,7 @@ public:
                 Tr.resize(3*obsNum, 3);
                 pl.resize(2*obsNum);
                 pr.resize(3*obsNum);
-                for (size_t i = 0; i < obsNum; i++)
-                {
+                for (size_t i = 0; i < obsNum; i++){
                     auto label = vSignals[j].ObsLabels[i];
                     size_t ti = label.frameIndex - rec_start;
                     Eigen::Matrix3f normFactor;
@@ -100,10 +108,6 @@ public:
                     pr( 3*i) = T(2,3)*uv(0) - pReader.camParams.INTRINSIC.row(0) * T.block<3,1>(0,3);
                     pr (3*i+1) = T(2,3)*uv(1) - pReader.camParams.INTRINSIC.row(1) * T.block<3,1>(0,3);
                     pr (3*i+2) = T(2,3) - pReader.camParams.INTRINSIC.row(2) * T.block<3,1>(0,3);
-                    // Tl.block<1, 3>(2*i, 0) = CAM_P.block<1, 3>(0, 0) - median(0) * CAM_P.block<1, 3>(2, 0);
-                    // Tl.block<1, 3>(2*i+1, 0) = CAM_P.block<1, 3>(1, 0) - median(1) * CAM_P.block<1, 3>(2, 0);
-                    // pl(2 * i) = CAM_P(0, 3) - median(0) * CAM_P(2, 3);
-                    // pl(2*i+1) = CAM_P(1, 3) - median(1) * CAM_P(2, 3);
                     // Eigen::Vector2i leftu(label.position.x, label.position.y);
                     // Eigen::Vector2i rightd(label.position.x+label.position.width, label.position.y+label.position.height); 
                     // Tl.block<1, 3>(2*i, 0) = CAM_P.block<1, 3>(0, 0) - leftu(0) * CAM_P.block<1, 3>(2, 0);
@@ -138,7 +142,7 @@ public:
                 vSignals[j].RightDownPos = rightpos;
                 //投影回来。
                 Eigen::Vector3f CamBack =Tcw.inverse().block<3,1>(0,2);
-                Eigen::Vector3f c2l = medpos -Tcw.inverse().block<3,1>(0,3);//因为traj是正的，是0到N帧的变换。所以取反方向再相减。
+                Eigen::Vector3f c2l = medpos -Tcw.inverse().block<3,1>(0,3);
                 //printf("cons %f  %f ",c2l.dot(CamBack)/(c2l.norm()*CamBack.norm()), CamBack(2));
                 if (c2l.dot(CamBack)/(c2l.norm()*CamBack.norm()) < 0.1 ){
                     printf("a passed lamp|\n");
@@ -176,12 +180,11 @@ public:
         return curRect;
     }
 
-    void label2signal (int FrameID,  vector<Label> *Labels)
-    {
-        vector<cv::Rect> LastLampRects;
+    void label2signal (int FrameID,  std::vector<Label> *Labels){
+        std::vector<cv::Rect> LastLampRects;
         if(Labels){ 
             // 有lable的话判断label归类。
-          //  vector<Label> *Labels = pReader.getLabels(FrameID);       
+          //  std::vector<Label> *Labels = pReader.getLabels(FrameID);       
             for (Label &label : *Labels){
                 bool NoParent = true;
                 // 把现存的signal 投过来，比对。
@@ -212,16 +215,13 @@ public:
             }
         }
     }
-    void runOnce(cv::Mat img, Eigen::Matrix4f Tcw, int FrameID, vector<Label> *Labels)
-    {
+    void runOnce(cv::Mat img, Eigen::Matrix4f Tcw, int FrameID, std::vector<Label> *Labels){
         cv::Mat img_light = img.clone();
-        vector<cv::Rect> RectsOri;
+        std::vector<cv::Rect> RectsOri;
         if(Labels)
-            for (Label &lab : *Labels)
-                {
+            for (Label &lab : *Labels){
                     using namespace cv;
-                    if(!undistortedImg)
-                    {
+                    if(!undistortedImg){
                         std::vector<cv::Point2f> srcPoints,dstPoints;
                         srcPoints.push_back(cv::Point2f(lab.position.x, lab.position.y));
                         srcPoints.push_back(cv::Point2f(lab.position.x+lab.position.width, lab.position.y+lab.position.height));
@@ -243,10 +243,9 @@ public:
                     // cv::rectangle(img, lamp_calib, cv::Scalar(0,0,255), 2);
                 }
             label2signal(FrameID, Labels);
-            vector <cv::Rect> Rects = updateSignals(FrameID, img, Tcw);
+            std::vector <cv::Rect> Rects = updateSignals(FrameID, img, Tcw);
             //if(Rects.size() == 0) Rects = RectsOri;
-            for(auto rect : Rects)
-            {
+            for(auto rect : Rects){
                 cv::rectangle(img_light,rect,cv::Scalar(0,0,255),2);
             }
        //  resize(img, img, cv::Size(968, 768));
@@ -274,8 +273,9 @@ public:
                 std::string name = img_path + numberss.str() + ".png";
                 
                 img = cv::imread(name);
-                if (img.empty())
+                if (img.empty()){
                     return 0;
+                }
                 if (!undistortedImg){
                     camMatrix = (cv::Mat_<float>(3,3)<<camm.fx, 0, camm.cx, 
                                                         0, camm.fy, camm.cy,
@@ -287,7 +287,7 @@ public:
                     img_calib = img.clone();
                 }
                 //cv::Mat showImg = img.clone(), showImg_calib = img_calib.clone();
-                vector<Label> *Labels = pReader.getLabels(drawImgsNum + rec_start);
+                std::vector<Label> *Labels = pReader.getLabels(drawImgsNum + rec_start);
                 Eigen::Matrix4f Tcw = pReader.trajectory[traj_start + drawImgsNum].inverse();
 
                 runOnce(img_calib, Tcw, rec_start+drawImgsNum, Labels);
@@ -302,17 +302,15 @@ public:
         return 0;
     }
 public:
-    cv::Mat camMatrix;
-    cv::Mat distCoeffs;
-    bool undistortedImg;
-    float lightw,lighth; 
-    int rec_start,traj_start;
-    ParameterReader pReader;
-    CamParams camm;
-    vector < Signal > vSignals;
+    cv::Mat camMatrix;// camera intrinsic, cv Mat
+    cv::Mat distCoeffs;// camera distortions
+    bool undistortedImg;// a flag indicate if the input image is undistorted
+    float lightw,lighth; // signal light's width、 height
+    int rec_start,traj_start;// label record start from frameId xx, trajectory record start from frameId xx
+    ParameterReader pReader; 
+    CamParams camm; // camera intrinsic, a  special class
+    std::vector < Signal > vSignals; // recontructed traffic signals
 };
-
-
 //
 int main(int argc, char** argv){
     ///就一个参数，参数文件位置
