@@ -5,3 +5,6 @@ build/
 cpplint.py
 styleCheck.sh
 styleFormat.sh
+Parameter.h.orig
+reports.txt
+CalibLight.cc.orig
