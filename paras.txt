@@ -17,33 +17,33 @@
 
 #当切换到kitti，需要修改1.undistorted 2.read img 接口 3. read label 接口
 #kitti 03
-label_path=/home/sensetime/Downloads/dataset/sequences/03/label.txt
-img_path=/home/sensetime/Downloads/dataset/sequences/03/image_0/
-trajectroy_path=/home/sensetime/Downloads/dataset/poses/03.txt
-rec_start=320
-rec_end=400
-traj_start=320
-isUndistorted=yes
-light_width_half=0.4
-light_height_half=0.2
-fx=721.5377
-fy=721.5377
-cx=609.5593
-cy=172.854
-distortion=0 0 0 0 0 
+#label_path=/home/sensetime/Downloads/dataset/sequences/03/label.txt
+#img_path=/home/sensetime/Downloads/dataset/sequences/03/image_0/
+#trajectroy_path=/home/sensetime/Downloads/dataset/poses/03.txt
+#rec_start=320
+#rec_end=400
+#traj_start=320
+#isUndistorted=yes
+#light_width_half=0.4
+#light_height_half=0.2
+#fx=721.5377
+#fy=721.5377
+#cx=609.5593
+#cy=172.854
+#distortion=0 0 0 0 0 
 
 #kitti 04
-#label_path=/home/sensetime/Downloads/dataset/sequences/04/label.txt
-#img_path=/home/sensetime/Downloads/dataset/sequences/04/image_0/
-#trajectroy_path=/home/sensetime/Downloads/dataset/poses/04.txt
-#rec_start=180
-#rec_end=270
-#traj_start=180
-#isUndistorted=yes
-#light_width_half=0.2
-#light_height_half=0.4
-#fx=707.0912
-#fy=707.0912
-#cx=601.8873
-#cy=183.1104
-#distortion=0 0 0 0 0 
+label_path=/home/sensetime/Downloads/dataset/sequences/04/label.txt
+img_path=/home/sensetime/Downloads/dataset/sequences/04/image_0/
+trajectroy_path=/home/sensetime/Downloads/dataset/poses/04.txt
+rec_start=180
+rec_end=270
+traj_start=180
+isUndistorted=yes
+light_width_half=0.3
+light_height_half=0.5
+fx=707.0912
+fy=707.0912
+cx=601.8873
+cy=183.1104
+distortion=0 0 0 0 0 
