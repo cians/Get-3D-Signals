@@ -5,21 +5,28 @@
  * @author CaoJian
  * @date 2018-04-02
  */
-#include "Parameter.h"
+#include "CalibLight.h"
 
 class RectCalib {
 public:
-    RectCalib(ParameterReader pd, Eigen::Matrix3f mK, float mD[5]) {
+    RectCalib() {}
+    RectCalib(const RectCalib & rc):undistortedImg(rc.undistortedImg),
+        traj_start(rc.traj_start), lightw(rc.lightw), lighth(rc.lighth), lightd(rc.lightd),
+        camMatrix(rc.camMatrix), distCoeffs(rc.distCoeffs), pReader(rc.pReader), vSignals(rc.vSignals) {}
+    RectCalib(ParameterReader pd, cv::Mat mK, cv::Mat mD):camMatrix(mK), distCoeffs(mD) {
         pReader = pd;
-        cv::eigen2cv(mK, camMatrix);
-        distCoeffs = cv::Mat(5,1, CV_32F, mD);
         undistortedImg = pReader.getData("isUndistorted") == "yes";
         traj_start = stoi(pReader.getData("traj_start"));
         lightw = stof(pReader.getData("light_width_half"));
         lighth = stof(pReader.getData("light_height_half"));
+        lightd = stof(pReader.getData("light_depth_half"));
     }
+    RectCalib(bool undistorted, int traj_start_, float lightw_, float lighth_, float lightd_,
+        cv::Mat mK_, cv::Mat mD_):undistortedImg(undistorted), traj_start(traj_start_),
+        lightw(lightw_), lighth(lighth_), lightd(lightd_), camMatrix(mK_), distCoeffs(mD_) {}
     /*!
-    *this function(LampCalib) is designed to calibrate the lamp's rectangle, but is abandoned now because of its poor robustness...
+    *this function(LampCalib) is designed to calibrate the lamp's rectangle, 
+    *but is abandoned now because of its poor robustness...
     *
     * cv::Rect LampCalib(cv::Rect oriRect, cv::Mat img)
     * {
@@ -68,9 +75,12 @@ public:
     * }
     */
     std::vector<cv::Rect> updateSignals(int FrameID, const cv::Mat &CurImg,
-        Eigen::Matrix4f Tcw, const std::vector<Eigen::Matrix4f>& Tcwss) {
+        cv::Mat Tcw, const std::vector<cv::Mat>& Twcss) {
         Eigen::Matrix3f CamInstri;
+        Eigen::Matrix4f Pose;
+        cv::cv2eigen(Tcw, Pose);
         cv::cv2eigen(camMatrix, CamInstri);
+       // printf("camInstri: %f %f %f\n",CamInstri(0,0),CamInstri(1,1),CamInstri(2,2));
         std::vector<cv::Rect> SignalRects;
         for (size_t j = 0; j < vSignals.size(); ++j) {
             cv::Rect curRect;
@@ -99,12 +109,8 @@ public:
                 pr.resize(3 * obsNum);
                 for (size_t i = 0; i < obsNum; i++) {
                     auto label = vSignals[j].ObsLabels[i];
-                    size_t ti = label.frameIndex - rec_start;
-                    Eigen::Matrix3f normFactor;
-                    normFactor << (1 / CurImg.cols), 0, 0,
-                               0, (1 / CurImg.rows), 0,
-                               0, 0, 1;
-                    Eigen::Matrix4f T = Tcwss[traj_start + ti].inverse();
+                    Eigen::Matrix4f T;
+                    cv::cv2eigen(Twcss[label.frameIndex-traj_start].inv(), T);
                     Eigen::Matrix3f R = T.block<3, 3>(0, 0);
                     Eigen::Matrix<float, 3, 3> KR = CamInstri * R;
                     Eigen::Vector2f uv((label.position.x + (label.position.width >> 1)),
@@ -115,7 +121,7 @@ public:
                     /// A: e^(0.5x), x = 2+fi-f,
                     /// B: -10/x, x = fi -f -1
                     ///  float coeff = exp(0.5 * (2 + static_cast<float>(label.frameIndex)
-                    ///                   - vSignals[j].ObsLabels[obsNum-1].frameIndex));  
+                    ///                   - vSignals[j].ObsLabels[obsNum-1].frameIndex));
                     float coeff = 10.0f /(1 - static_cast<float>(label.frameIndex)
                                      + vSignals[j].ObsLabels[obsNum-1].frameIndex);
                     /// cout << "coeff:" << coeff << '\n';
@@ -156,8 +162,9 @@ public:
                 /// printf("leftu: %f %f %f, rightd: %f %f %f\n",leftpos(0),
                 /// leftpos(1),leftpos(2),rightpos(0),rightpos(1),rightpos(2));
                 /// 灯的实际大小应该是个固定值。。。
-                Eigen::Vector3f leftpos(medpos(0) - lightw, medpos(1) - lighth, medpos(2));
-                Eigen::Vector3f rightpos(medpos(0) + lightw, medpos(1) + lighth, medpos(2));
+                Eigen::Vector3f leftpos(medpos(0) - lightw, medpos(1) - lighth, medpos(2) + lightd);
+                Eigen::Vector3f rightpos(medpos(0) + lightw, medpos(1) + lighth, medpos(2) + lightd);
+                Eigen::Vector3f rightdepPos(medpos(0) + lightw, medpos(1) - lighth, medpos(2) - lightd);
                 /*!
                 /// float errors = 0;
                 /// for(size_t i = 0; i < obsNum; ++i){
@@ -173,16 +180,16 @@ public:
                 vSignals[j].LeftUpPos = leftpos;
                 vSignals[j].RightDownPos = rightpos;
                 /// 投影回来。
-                Eigen::Vector3f CamBack = Tcw.inverse().block<3, 1>(0, 2);
-                Eigen::Vector3f c2l = medpos - Tcw.inverse().block<3, 1>(0, 3);
+                Eigen::Vector3f CamBack = Pose.inverse().block<3, 1>(0, 2);
+                Eigen::Vector3f c2l = medpos - Pose.inverse().block<3, 1>(0, 3);
                 /// printf("cons %f  %f ",c2l.dot(CamBack) / (c2l.norm()*CamBack.norm()), CamBack(2));
                 if ( c2l.dot(CamBack) / (c2l.norm() * CamBack.norm() ) < 0.2 ) {
                     printf("a passed lamp|\n");
                     vSignals[j].trackStatus = "passed";
                     continue;
                 }
-                auto cam_p = CamInstri * Tcw.block<3, 4>(0, 0);
-                curRect = reproject2img(leftpos, rightpos, cam_p);
+                auto cam_p = CamInstri * Pose.block<3, 4>(0, 0);
+                curRect = reproject2img(leftpos, rightpos, rightdepPos, cam_p);
                 /// if ((curRect.width < 4 && curRect.height < 8) ||
                 ///             (curRect.width > 30 && curRect.height > 60)){
                 ///     continue;
@@ -198,29 +205,29 @@ public:
         return SignalRects;
     }
     cv::Rect reproject2img(Eigen::Vector3f LeftUpPos, Eigen::Vector3f RightDownPos,
-                           Eigen::Matrix<float, 3, 4>cam_p) {
-        Eigen::Vector4f Lamp4f;
-        /// left up
-        Lamp4f.segment(0, 3) = LeftUpPos;
-        Lamp4f(3) = 1;
-        auto left3f = cam_p * Lamp4f;
-        Eigen::Vector2i Left2i(static_cast<int>(left3f(0) / left3f(2)),
-                               static_cast<int>(left3f(1) / left3f(2)));
-        /// printf("imgcoord2i Left: %d,%d\n",Left2i(0),Left2i(1));
-        /// right down
-        Lamp4f.segment(0, 3) = RightDownPos;
-        auto Right3f = cam_p * Lamp4f;
-        Eigen::Vector2i Right2i(static_cast<int>(Right3f(0) / Right3f(2)),
-                                static_cast<int>(Right3f(1) / Right3f(2)));
-        /// printf("imgcoord2i Right: %d,%d\n",Right2i(0),Right2i(1));
-        cv::Rect curRect(Left2i(0), Left2i(1), Right2i(0) - Left2i(0),
-                         Right2i(1) - Left2i(1));
+                   Eigen::Vector3f RightupDepPos, Eigen::Matrix<float, 3, 4>cam_p) {
+        // left up
+        auto left3f = cam_p.block<3, 3>(0, 0) * LeftUpPos + cam_p.block<3, 1>(0, 3);
+        cv::Point2i Left2i(static_cast<int>(left3f(0)/left3f(2)), static_cast<int>(left3f(1)/left3f(2)));
+        // right down
+        auto Right3f = cam_p.block<3, 3>(0, 0) * RightDownPos + cam_p.block<3, 1>(0, 3);
+        cv::Point2i Right2i(static_cast<int>(Right3f(0)/Right3f(2)), static_cast<int>(Right3f(1)/Right3f(2)));
+        // right up depth
+        auto RUPdepth3f = cam_p.block<3, 3>(0, 0) * RightupDepPos + cam_p.block<3, 1>(0, 3);
+        cv::Point2i RUPdepth2i(static_cast<int>(RUPdepth3f(0)/RUPdepth3f(2)),
+                                                static_cast<int>(RUPdepth3f(1)/RUPdepth3f(2)));
+        // printf("imgcoord2i Right: %d,%d\n",Right2i(0),Right2i(1));
+        std::vector<cv::Point2i> lightPoss;
+        lightPoss.push_back(Left2i);
+        lightPoss.push_back(Right2i);
+        lightPoss.push_back(RUPdepth2i);
+        cv::Rect curRect = cv::boundingRect(lightPoss);
         return curRect;
     }
 
     void label2signal(int FrameID,  std::vector<Label> *Labels) {
         std::vector<cv::Rect> LastLampRects;
-        if (Labels) {
+        if (Labels->size()) {
             /// 有lable的话判断label归类。
             ///  std::vector<Label> *Labels = pReader.getLabels(FrameID);
             for (Label &label : *Labels) {
@@ -256,10 +263,11 @@ public:
             }
         }
     }
-    void runOnce(cv::Mat img, Eigen::Matrix4f Tcw, int FrameID,
-        std::vector<Label> *Labels, std::vector<Eigen::Matrix4f> Tcwss) {
+    std::vector <cv::Rect> runOnce(cv::Mat& img, cv::Mat Tcw, int FrameID,
+        std::vector<Label> *Labels, std::vector<cv::Mat>& Twcss, int traj_st) {
+        traj_start = traj_st;
         cv::Mat img_light = img.clone();
-        std::vector<cv::Rect> RectsOri;
+        std::vector<cv::Rect> RectsOri(0);
         if (Labels) {
             for (Label &lab : *Labels) {
                 using namespace cv;
@@ -269,12 +277,14 @@ public:
                     srcPoints.push_back(cv::Point2f(lab.position.x + lab.position.width,
                                                     lab.position.y + lab.position.height));
                     cv::undistortPoints(srcPoints, dstPoints, camMatrix, distCoeffs);
-                    dstPoints[0].x = dstPoints[0].x * camMatrix.at<float>(0,0) +  camMatrix.at<float>(0,2);
-                    dstPoints[0].y = dstPoints[0].y * camMatrix.at<float>(1,1) +  camMatrix.at<float>(1,2);
-                    dstPoints[1].x = dstPoints[1].x * camMatrix.at<float>(0,0) +  camMatrix.at<float>(0,2);
-                    dstPoints[1].y = dstPoints[1].y * camMatrix.at<float>(1,1) +  camMatrix.at<float>(1,2);
-                    lab.position.x = static_cast<int> (dstPoints[0].x);
-                    lab.position.y = static_cast<int> (dstPoints[0].y);
+                    dstPoints[0].x = dstPoints[0].x * camMatrix.at<float>(0, 0) +  camMatrix.at<float>(0, 2);
+                    dstPoints[0].y = dstPoints[0].y * camMatrix.at<float>(1, 1) +  camMatrix.at<float>(1, 2);
+                    dstPoints[1].x = dstPoints[1].x * camMatrix.at<float>(0, 0) +  camMatrix.at<float>(0, 2);
+                    dstPoints[1].y = dstPoints[1].y * camMatrix.at<float>(1, 1) +  camMatrix.at<float>(1, 2);
+                    dstPoints[1].x = std::min(static_cast<int>(dstPoints[1].x), img.cols);
+                    dstPoints[1].y = std::min(static_cast<int>(dstPoints[1].y), img.rows);
+                    lab.position.x = std::max(static_cast<int> (dstPoints[0].x), 0);
+                    lab.position.y = std::max(static_cast<int> (dstPoints[0].y), 0);
                     lab.position.width = static_cast<int> (dstPoints[1].x - dstPoints[0].x);
                     lab.position.height = static_cast<int> (dstPoints[1].y - dstPoints[0].y);
                     if (lab.position.x < 0 || lab.position.y < 0 || dstPoints[1].x > img.cols
@@ -287,9 +297,9 @@ public:
                 /// cv::Rect lamp_calib = LampCalib(lab.position, img);
                 /// cv::rectangle(img, lamp_calib, cv::Scalar(0,0,255), 2);
             }
+            label2signal(FrameID, Labels);
         }
-        label2signal(FrameID, Labels);
-        std::vector <cv::Rect> Rects = updateSignals(FrameID, img, Tcw, Tcwss);
+        std::vector <cv::Rect> Rects = updateSignals(FrameID, img, Tcw, Twcss);
         /// if(Rects.size() == 0) Rects = RectsOri;
         for (auto rect : Rects) {
             cv::rectangle(img_light, rect, cv::Scalar(0, 0, 255), 2);
@@ -299,13 +309,14 @@ public:
         cv::imshow("original", img);
         cv::imshow("rectified", img_light);
         cv::waitKey(100);
+        return Rects;
     }
     int run() {
         cv::VideoCapture imgShowSeque;
         string img_path = pReader.getData("img_path");
         int drawImgsNum = 0;
         bool playvideo = true;
-        rec_start = stoi(pReader.getData("rec_start"));
+        int rec_start = stoi(pReader.getData("rec_start"));
         while (drawImgsNum < 600) {
             /// 一帧帧显示图像
             cv::Mat img, img_calib;
@@ -330,9 +341,9 @@ public:
             }
             /// cv::Mat showImg = img.clone(), showImg_calib = img_calib.clone();
             std::vector<Label> *Labels = pReader.getLabels(drawImgsNum + rec_start);
-            Eigen::Matrix4f Tcw = pReader.trajectory[traj_start + drawImgsNum].inverse();
-
-            runOnce(img_calib, Tcw, rec_start + drawImgsNum, Labels, pReader.trajectory);
+            cv::Mat Tcw = pReader.trajectory[rec_start + drawImgsNum - traj_start].inv();
+            int traj_st = stoi(pReader.getData("traj_start"));
+            runOnce(img_calib, Tcw, rec_start + drawImgsNum, Labels, pReader.trajectory, traj_st);
 
             char presskey = cv::waitKey(500);
             if (presskey == 'p') {
@@ -347,13 +358,12 @@ public:
     }
 
 public:
+    bool undistortedImg;    /// a flag indicate if the input image is undistorted
+    int  traj_start;     /// label record start from frameId xx, trajectory record start from frameId xx
+    float lightw, lighth, lightd;     /// signal light's width、 height,depth
     cv::Mat camMatrix;    /// camera intrinsic, cv Mat
     cv::Mat distCoeffs;    /// camera distortions
-    bool undistortedImg;    /// a flag indicate if the input image is undistorted
-    float lightw, lighth;     /// signal light's width、 height
-    int rec_start,
-        traj_start;     /// label record start from frameId xx, trajectory record start from frameId xx
-    ParameterReader pReader;   
+    ParameterReader pReader;
     std::vector < Signal > vSignals;     /// recontructed traffic signals
 };
 int main(int argc, char **argv) {
@@ -363,7 +373,10 @@ int main(int argc, char **argv) {
         return -1;
     }
     ParameterReader pReader(argv[1]);
-    RectCalib RC(pReader, pReader.camParams.INTRINSIC, pReader.camParams.distortion);
+    cv::Mat camMatrix;
+    cv::eigen2cv(pReader.camParams.INTRINSIC, camMatrix);
+    cv::Mat distCoeffs = cv::Mat(5, 1, CV_32F, pReader.camParams.distortion);
+    RectCalib RC(pReader, camMatrix, distCoeffs);
     RC.run();
     return 0;
 }

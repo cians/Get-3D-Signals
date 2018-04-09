@@ -5,8 +5,8 @@
  * @author CaoJian
  * @date 2018-04-02
  */
-#ifndef _GOD_PARAMETERR_H_
-#define _GOD_PARAMETERR_H_
+#ifndef _GOD_CALIBLIGHT_H_
+#define _GOD_CALIBLIGHT_H_
 #include <Eigen/Eigen>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
@@ -22,6 +22,7 @@
 #include <fstream>
 #include <unordered_map>
 #include <vector>
+#include <algorithm>
 
 using std::string;
 using std::cout;
@@ -77,7 +78,8 @@ public:
 };
 /*!
  * @brief
- * ParameterReader will read parameters.txt and then record camera intrinsic、camera pose、traffic signal label data etc...
+ * ParameterReader will read parameters.txt and then record camera intrinsic、
+ * camera pose、traffic signal label data etc...
  */
 class ParameterReader {
 public:
@@ -191,7 +193,9 @@ public:
                      linedata[4], linedata[5], linedata[6], linedata[7],
                      linedata[8], linedata[9], linedata[10], linedata[11],
                      0, 0, 0, 1;
-                trajectory.push_back(Pose);
+                cv::Mat Twc(4, 4, CV_32F);
+                cv::eigen2cv(Pose, Twc);
+                trajectory.push_back(Twc);
             } else if (sscanf(line.c_str(), "%f %f %f %f %f %f %f %f", &tm, &linedata[0],
                               &linedata[1], &linedata[2],
                               &linedata[3], &linedata[4], &linedata[5], &linedata[6]) == 8) {
@@ -215,7 +219,9 @@ public:
                 Pose(3, 3) = 1;
                 /// center = -Pose.block<3,3>(0,0).transpose()*Pose.block<3,1>(0,3);
                 /// center = Eigen::Vector3d(linedata[0],linedata[1],linedata[2]);
-                trajectory.push_back(Pose);
+                cv::Mat Twc(4, 4, CV_32F);
+                cv::eigen2cv(Pose, Twc);
+                trajectory.push_back(Twc);
             }
         }
     }
@@ -258,9 +264,9 @@ public:
 
 public:
     std::unordered_map <string, string> paramsMap;   ///  parameters
-    std::vector<Eigen::Matrix<float, 4, 4> > trajectory;    ///   camera trajectory
+    std::vector<cv::Mat> trajectory;    ///   camera trajectory
     std::unordered_map<int, std::vector< Label>>
             LabelData;    ///   Labeldata for each frame;
     CamParams camParams;    ///  camera intrinsic
 };
-#endif   // _GOD_PARAMETERR_H_
+#endif   // _GOD_CALIBLIGHT_H_
