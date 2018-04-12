@@ -80,7 +80,6 @@ public:
         Eigen::Matrix4f Pose;
         cv::cv2eigen(Tcw, Pose);
         cv::cv2eigen(camMatrix, CamInstri);
-       // printf("camInstri: %f %f %f\n",CamInstri(0,0),CamInstri(1,1),CamInstri(2,2));
         std::vector<cv::Rect> SignalRects;
         for (size_t j = 0; j < vSignals.size(); ++j) {
             cv::Rect curRect;
@@ -124,7 +123,6 @@ public:
                     ///                   - vSignals[j].ObsLabels[obsNum-1].frameIndex));
                     float coeff = 10.0f /(1 - static_cast<float>(label.frameIndex)
                                      + vSignals[j].ObsLabels[obsNum-1].frameIndex);
-                    /// cout << "coeff:" << coeff << '\n';
                     /// coeff = 1;
                     Tr.block<1, 3>(3 * i, 0)  = coeff * (KR.row(0) - uv(0) * R.row(2));
                     Tr.block<1, 3>(3 * i + 1, 0) = coeff * (KR.row(1) - uv(1) * R.row(2));
@@ -135,19 +133,6 @@ public:
                                     row(1) * T.block<3, 1>(0, 3));
                     pr(3 * i + 2) = coeff * (T(2, 3) - CamInstri.row(2) *
                                     T.block<3, 1>(0, 3));
-                    /*!
-                    /// Eigen::Vector2i leftu(label.position.x, label.position.y);
-                    /// Eigen::Vector2i rightd(label.position.x+label.position.width,
-                                /// label.position.y+label.position.height);
-                    /// Tl.block<1, 3>(2*i, 0) = CAM_P.block<1, 3>(0, 0) - leftu(0) * CAM_P.block<1, 3>(2, 0);
-                    /// Tl.block<1, 3>(2*i+1, 0) = CAM_P.block<1, 3>(1, 0) - leftu(1) * CAM_P.block<1, 3>(2, 0);
-                    /// pl(2 * i) = CAM_P(0, 3) - leftu(0) * CAM_P(2, 3);
-                    /// pl(2*i+1) = CAM_P(1, 3) - leftu(1) * CAM_P(2, 3);
-                    /// Tr.block<1, 3>(2*i, 0) = CAM_P.block<1, 3>(0, 0) - rightd(0) * CAM_P.block<1, 3>(2, 0);
-                    /// Tr.block<1, 3>(2*i+1, 0) = CAM_P.block<1, 3>(1, 0) - rightd(1) * CAM_P.block<1, 3>(2, 0);
-                    /// pr(2 * i) = CAM_P(0, 3) - rightd(0) * CAM_P(2, 3);
-                    /// pr(2*i+1) = CAM_P(1, 3) - rightd(1) * CAM_P(2, 3);
-                    */
                 }
                 /// Eigen::Vector3f medpos = (Tl.transpose()*Tl).colPivHouseholderQr()
                 ///                             .solve(-Tl.transpose()*pl);
@@ -216,7 +201,6 @@ public:
         auto RUPdepth3f = cam_p.block<3, 3>(0, 0) * RightupDepPos + cam_p.block<3, 1>(0, 3);
         cv::Point2i RUPdepth2i(static_cast<int>(RUPdepth3f(0)/RUPdepth3f(2)),
                                                 static_cast<int>(RUPdepth3f(1)/RUPdepth3f(2)));
-        // printf("imgcoord2i Right: %d,%d\n",Right2i(0),Right2i(1));
         std::vector<cv::Point2i> lightPoss;
         lightPoss.push_back(Left2i);
         lightPoss.push_back(Right2i);
@@ -359,12 +343,12 @@ public:
 
 public:
     bool undistortedImg;    /// a flag indicate if the input image is undistorted
-    int  traj_start;     /// label record start from frameId xx, trajectory record start from frameId xx
+    int  traj_start;     /// trajectory record start index after label start
     float lightw, lighth, lightd;     /// signal light's width、 height,depth
     cv::Mat camMatrix;    /// camera intrinsic, cv Mat
     cv::Mat distCoeffs;    /// camera distortions
     ParameterReader pReader;
-    std::vector < Signal > vSignals;     /// recontructed traffic signals
+    std::vector < Signal > vSignals;   /// recontructed traffic signals
 };
 int main(int argc, char **argv) {
     ////就一个参数，参数文件位置

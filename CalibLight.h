@@ -265,8 +265,7 @@ public:
 public:
     std::unordered_map <string, string> paramsMap;   ///  parameters
     std::vector<cv::Mat> trajectory;    ///   camera trajectory
-    std::unordered_map<int, std::vector< Label>>
-            LabelData;    ///   Labeldata for each frame;
+    std::unordered_map<int, std::vector< Label>> LabelData;    /// Labeldata
     CamParams camParams;    ///  camera intrinsic
 };
 #endif   // _GOD_CALIBLIGHT_H_
